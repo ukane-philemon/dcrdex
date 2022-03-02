@@ -148,6 +148,7 @@ type TRPCClient struct {
 	requestErr error
 	banished   bool
 	sends      []*msgjson.Message
+	sendRaw    [][]byte
 	reqs       []*tReq
 	on         uint32
 	closed     chan struct{}
@@ -159,6 +160,10 @@ func (c *TRPCClient) Addr() string  { return c.addr }
 func (c *TRPCClient) Authorized()   {}
 func (c *TRPCClient) Send(msg *msgjson.Message) error {
 	c.sends = append(c.sends, msg)
+	return c.sendErr
+}
+func (c *TRPCClient) SendRaw(msg []byte) error {
+	c.sendRaw = append(c.sendRaw, msg)
 	return c.sendErr
 }
 func (c *TRPCClient) SendError(id uint64, msg *msgjson.Error) {

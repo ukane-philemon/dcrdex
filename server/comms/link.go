@@ -30,6 +30,8 @@ type Link interface {
 	Addr() string
 	// Send sends the msgjson.Message to the peer.
 	Send(msg *msgjson.Message) error
+	// SendRaw sends the provide Message byte to the peer.
+	SendRaw(msg []byte) error
 	// SendError sends the msgjson.Error to the peer, with reference to a
 	// request message ID.
 	SendError(id uint64, rpcErr *msgjson.Error)

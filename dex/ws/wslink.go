@@ -105,6 +105,25 @@ func (c *WSLink) Send(msg *msgjson.Message) error {
 	return c.send(msg, nil)
 }
 
+// SendRaw sends the provided Message byte to the websocket peer. It is like Send but
+// it does not marshall the recieved Message byte.
+func (c *WSLink) SendRaw(msg []byte) error {
+	if c.Off() {
+		return ErrPeerDisconnected
+	}
+
+	// NOTE: Without the stopped chan or access to the Context we are now racing
+	// after the c.Off check above.
+	writeErr := make(chan error, 1)
+	select {
+	case c.outChan <- &sendData{msg, writeErr}:
+	case <-c.stopped:
+		return ErrPeerDisconnected
+	}
+
+	return nil
+}
+
 // SendNow is like send, but it waits for the message to be written on the
 // peer's link, returning any error from the write.
 func (c *WSLink) SendNow(msg *msgjson.Message) error {
@@ -321,6 +340,7 @@ func (c *WSLink) outHandler(ctx context.Context) {
 			// control frame.
 			writeFailed = true
 			c.stop()
+			c.log.Debug(err)
 			return
 		}
 		writeCount++

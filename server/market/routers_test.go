@@ -1447,6 +1447,7 @@ type TLink struct {
 	id          uint64
 	ip          dex.IPKey
 	addr        string
+	sendRaw     [][]byte
 	sends       []*msgjson.Message
 	sendErr     error
 	sendTrigger chan struct{}
@@ -1479,6 +1480,16 @@ func (conn *TLink) Send(msg *msgjson.Message) error {
 		return conn.sendErr
 	}
 	conn.sends = append(conn.sends, msg)
+	conn.sendTrigger <- struct{}{}
+	return nil
+}
+func (conn *TLink) SendRaw(msg []byte) error {
+	conn.mtx.Lock()
+	defer conn.mtx.Unlock()
+	if conn.sendErr != nil {
+		return conn.sendErr
+	}
+	conn.sendRaw = append(conn.sendRaw, msg)
 	conn.sendTrigger <- struct{}{}
 	return nil
 }

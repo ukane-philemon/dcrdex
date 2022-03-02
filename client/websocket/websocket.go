@@ -176,8 +176,13 @@ func (s *Server) Notify(route string, payload interface{}) {
 	}
 	s.clientsMtx.RLock()
 	defer s.clientsMtx.RUnlock()
+	b, err := json.Marshal(msg)
+	if err != nil {
+		s.log.Errorf("json.Marshal error: %v", err)
+		return
+	}
 	for _, cl := range s.clients {
-		if err = cl.Send(msg); err != nil {
+		if err = cl.SendRaw(b); err != nil {
 			s.log.Warnf("Failed to send %v notification to client %v at %v: %v",
 				msg.Route, cl.cid, cl.Addr(), err)
 		}

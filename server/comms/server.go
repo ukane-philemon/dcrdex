@@ -628,9 +628,13 @@ func (s *Server) Broadcast(msg *msgjson.Message) {
 	if log.Level() <= dex.LevelTrace { // don't marshal unless needed
 		log.Tracef("Broadcast: %q", msg.String())
 	}
-
+	b, err := json.Marshal(msg)
+	if err != nil {
+		log.Errorf("Broadcast: json.Marshal error-: %v", err)
+		return
+	}
 	for id, cl := range s.clients {
-		if err := cl.Send(msg); err != nil {
+		if err := cl.SendRaw(b); err != nil {
 			log.Debugf("Send to client %d at %s failed: %v", id, cl.Addr(), err)
 			cl.Disconnect() // triggers return of websocketHandler, and removeClient
 		}

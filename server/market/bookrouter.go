@@ -5,6 +5,7 @@ package market
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -705,8 +706,13 @@ func (r *BookRouter) sendNote(route string, subs *subscribers, note interface{})
 
 	var deletes []uint64
 	subs.mtx.RLock()
+	b, err := json.Marshal(msg)
+	if err != nil {
+		log.Errorf("BookRouter.sendNote: json.Marshal error- %v", err)
+		return
+	}
 	for _, conn := range subs.conns {
-		err := conn.Send(msg)
+		err := conn.SendRaw(b)
 		if err != nil {
 			deletes = append(deletes, conn.ID())
 		}

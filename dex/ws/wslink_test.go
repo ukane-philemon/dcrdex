@@ -23,9 +23,10 @@ import (
 var tLogger = dex.StdOutLogger("ws_TEST", dex.LevelTrace)
 
 type ConnStub struct {
-	inMsg  chan []byte
-	inErr  chan error
-	closed int32
+	inMsg   chan []byte
+	inErr   chan error
+	closed  int32
+	sendraw bool
 }
 
 func (c *ConnStub) Close() error {
@@ -78,10 +79,13 @@ func (c *ConnStub) WriteMessage(_ int, b []byte) error {
 	if err != nil {
 		return err
 	}
-	if msg.ID != uint64(lastID+1) {
-		return fmt.Errorf("sent out of sequence. got %d, want %v", msg.ID, uint64(lastID+1))
+	if !c.sendraw {
+		if msg.ID != uint64(lastID+1) {
+			return fmt.Errorf("sent out of sequence. got %d, want %v", msg.ID, uint64(lastID+1))
+		}
+		lastID++
 	}
-	lastID++
+
 	writeDuration := microSecDelay(stdDev, minInterval)
 	time.Sleep(writeDuration)
 	return nil
@@ -204,7 +208,6 @@ func TestWSLink_send(t *testing.T) {
 		msg.ID++
 		time.Sleep(microSecDelay(sendStdDev, sendMin))
 	}
-
 	// send much faster briefly, building queue up a bit to be drained on disconnect
 	sendStdDev = stdDev * 4 / 5
 	sendMin = minInterval / 2
@@ -229,5 +232,84 @@ func TestWSLink_send(t *testing.T) {
 
 	if lastID != int64(msg.ID-1) {
 		t.Errorf("final message %d not sent, last ID is %d", msg.ID-1, lastID)
+	}
+}
+
+func TestWSLink_SendRaw(t *testing.T) {
+	defer os.Stdout.Sync()
+
+	inHandler := make(chan struct{}, 1)
+	inMsgHandler := func(msg *msgjson.Message) *msgjson.Error {
+		inHandler <- struct{}{}
+		return nil
+	}
+
+	conn := &ConnStub{
+		inMsg:   make(chan []byte, 1),
+		inErr:   make(chan error, 1),
+		sendraw: true,
+	}
+	addrs := map[int32]dex.IPKey{
+		1: {16, 16, 120, 120 /* ipv6 1010:7878:: */},
+		2: {18, 18, 120, 120 /* ipv6 1212:7878:: */},
+		3: {17, 16, 120, 120 /* ipv6 1110:7878:: */},
+		4: {18, 16, 120, 120 /* ipv6 1210:7878:: */},
+		5: {17, 18, 120, 120 /* ipv6 1112:7878:: */},
+	}
+
+	clients := make(map[int32]*WSLink)
+	for i := int32(1); i <= int32(len(addrs)); i++ {
+		wsLink := NewWSLink(addrs[i].String(), conn, time.Second, inMsgHandler, tLogger)
+		clients[i] = wsLink
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// start the in/out/pingHandlers, and the initial read deadline
+	for _, cl := range clients {
+		wg, err := cl.Connect(ctx)
+		if err != nil {
+			t.Fatalf("#%s: Connect: %v", cl.addr, err)
+		}
+		defer wg.Wait()
+	}
+
+	// hit the inHandler once before testing sends
+	msg, _ := msgjson.NewRequest(12, "beep", "boop")
+	b, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// give something for inHandler to read
+	conn.inMsg <- b
+	// ensure that the handler was called
+	select {
+	case <-inHandler:
+	case <-time.NewTimer(time.Second).C:
+		t.Fatal("in handler not called")
+	}
+
+	// sends
+	stuff := struct {
+		Thing int    `json:"thing"`
+		Blah  string `json:"stuff"`
+	}{
+		12, "asdf",
+	}
+	msg, _ = msgjson.NewNotification("blah", stuff)
+	b, err = json.Marshal(msg)
+	if err != nil {
+
+	}
+	for _, cl := range clients {
+		err = cl.SendRaw(b)
+		if err != nil {
+			t.Fatalf("#%s: SendRaw failed: %v", cl.addr, err)
+		}
+	}
+	for _, cl := range clients {
+		cl.Disconnect()
+		// Make like a good connection manager and wait for the wsLink to shutdown.
+		cl.wg.Wait()
 	}
 }
