@@ -4,6 +4,7 @@ import { postJSON } from './http'
 import State from './state'
 import * as intl from './locales'
 import { RateEncodingFactor } from './orderutil'
+import ws from './ws'
 
 /*
  * NewWalletForm should be used with the "newWalletForm" template. The enclosing
@@ -940,6 +941,12 @@ export class LoginForm {
     }
     const loaded = app().loading(this.form)
     const res = await postJSON('/api/login', { pass: pw, rememberPass })
+    if (ws.connection === null) {
+      page.errMsg.textContent = intl.prep(intl.ID_CONNECTION_FAILED)
+      loaded()
+      Doc.show(page.errMsg)
+      return
+    }
     loaded()
     if (!app().checkResponse(res)) {
       page.errMsg.textContent = res.msg
