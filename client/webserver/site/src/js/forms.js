@@ -227,7 +227,14 @@ export class WalletConfigForm {
    */
   async fileInputChanged () {
     Doc.hide(this.errMsg)
+    const supportedFileExt = ['.conf', '.ini', '.cfg', '.cnf']
     if (!this.fileInput.value) return
+    const fileExt = '.' + this.fileInput.value.split('.').pop()
+    if (supportedFileExt.indexOf(fileExt) < 0) {
+      this.errMsg.textContent = `File extension not supported. Use ${supportedFileExt.toString()}.`
+      Doc.show(this.errMsg)
+      return
+    }
     const loaded = app().loading(this.form)
     const config = await this.fileInput.files[0].text()
     if (!config) return
