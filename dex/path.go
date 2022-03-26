@@ -5,9 +5,7 @@ package dex
 
 import (
 	"os"
-	"os/user"
 	"path/filepath"
-	"runtime"
 	"strings"
 )
 
@@ -23,44 +21,48 @@ func CleanAndExpandPath(path string) string {
 	// %VARIABLE%, but the variables can still be expanded via POSIX-style
 	// $VARIABLE.
 	path = os.ExpandEnv(path)
-
-	if !strings.HasPrefix(path, "~") {
+	if !strings.HasPrefix(path, "~") || strings.IndexAny(path, "%") < 0 {
 		return filepath.Clean(path)
 	}
 
-	// Expand initial ~ to the current user's home directory, or ~otheruser
-	// to otheruser's home directory.  On Windows, both forward and backward
-	// slashes can be used.
-	path = path[1:]
-
-	var pathSeparators string
-	if runtime.GOOS == "windows" {
-		pathSeparators = string(os.PathSeparator) + "/"
-	} else {
-		pathSeparators = string(os.PathSeparator)
+	// This expandWindowsEnv supports Windows cmd.exe-style %VARIABLE%.
+	if strings.IndexAny(path, "%") > -1 {
+		path = expandWindowsEnv(path)
+		return filepath.Clean(path)
 	}
 
-	userName := ""
-	if i := strings.IndexAny(path, pathSeparators); i != -1 {
-		userName = path[:i]
-		path = path[i:]
+	path, err := os.UserHomeDir()
+	if err != nil {
+		// Fallback to CWD if retrieving user home directory fails.
+		path = "."
 	}
 
-	homeDir := ""
-	var u *user.User
-	var err error
-	if userName == "" {
-		u, err = user.Current()
-	} else {
-		u, err = user.Lookup(userName)
+	return filepath.Join(path, path[1:])
+}
+
+// expandWindowsEnv is a helper that suppports expanding windows cmd.exe-style
+// %VARIABLE%.
+func expandWindowsEnv(path string) string {
+	// Split path into "dir" if any, and "envPath".
+	i := strings.IndexAny(path, "%")
+	dir := path[:i]
+	envPath := path[i+1:]
+
+	// Split envPath into env and path.
+	x := strings.IndexAny(envPath, "%")
+	path = envPath[x+1:]
+	if x < 0 {
+		return filepath.Join(dir, path)
 	}
-	if err == nil {
-		homeDir = u.HomeDir
+	env := strings.ToUpper(envPath[:x])
+	dirName := os.Getenv(env)
+	if dirName == "" {
+		return filepath.Join(dir, path)
 	}
-	// Fallback to CWD if user lookup fails or user has no home directory.
-	if homeDir == "" {
-		homeDir = "."
+	if filepath.IsAbs(dirName) {
+		// concat env with path if the env value is an absolute path.
+		return filepath.Join(dirName, path)
 	}
 
-	return filepath.Join(homeDir, path)
+	return filepath.Join(dir, dirName, path)
 }
