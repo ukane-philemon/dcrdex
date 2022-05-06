@@ -2354,6 +2354,7 @@ type tSenderType byte
 const (
 	tPayFeeSender tSenderType = iota
 	tWithdrawSender
+	tSendSender
 )
 
 func testSender(t *testing.T, senderType tSenderType, segwit bool, walletType string) {
@@ -2369,6 +2370,11 @@ func testSender(t *testing.T, senderType tSenderType, segwit bool, walletType st
 	if senderType == tWithdrawSender {
 		sender = func(addr string, val uint64) (asset.Coin, error) {
 			return wallet.Withdraw(addr, val, feeSuggestion)
+		}
+	}
+	if senderType == tSendSender {
+		sender = func(addr string, val uint64) (asset.Coin, error) {
+			return wallet.Send(addr, val, feeSuggestion)
 		}
 	}
 	addr := btcAddr(segwit)
@@ -2478,6 +2484,12 @@ func testEstimateRegistrationTxFee(t *testing.T, segwit bool, walletType string)
 func TestWithdraw(t *testing.T) {
 	runRubric(t, func(t *testing.T, segwit bool, walletType string) {
 		testSender(t, tWithdrawSender, segwit, walletType)
+	})
+}
+
+func TestSend(t *testing.T) {
+	runRubric(t, func(t *testing.T, segwit bool, walletType string) {
+		testSender(t, tSendSender, segwit, walletType)
 	})
 }
 

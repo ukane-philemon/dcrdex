@@ -11,7 +11,7 @@ import (
 )
 
 // WalletTrait is a bitset indicating various optional wallet features, such as
-// the presence of auxiliary methods like Rescan and Send.
+// the presence of auxiliary methods like Rescan, Send and Withdraw.
 type WalletTrait uint64
 
 const (
@@ -330,9 +330,6 @@ type Wallet interface {
 	// The contract and matchTime are provided so that wallets may search for
 	// the coin using light filters.
 	SwapConfirmations(ctx context.Context, coinID dex.Bytes, contract dex.Bytes, matchTime time.Time) (confs uint32, spent bool, err error)
-	// Withdraw withdraws funds to the specified address. Fees are subtracted
-	// from the value.
-	Withdraw(address string, value, feeRate uint64) (Coin, error)
 	// ValidateSecret checks that the secret hashes to the secret hash.
 	ValidateSecret(secret, secretHash []byte) bool
 	// SyncStatus is information about the blockchain sync status. It should
@@ -366,7 +363,17 @@ type Recoverer interface {
 // Sender is a wallet that can send funds to an address, as opposed to
 // withdrawing a certain amount from the source wallet/account.
 type Sender interface {
+	// Send sends funds to the specified address. Fees are not
+	// subtracted from the value.
 	Send(address string, value, feeSuggestion uint64) (Coin, error)
+}
+
+// Withdrawer is a wallet that can withdraw a certain amount from the
+// source wallet/account
+type Withdrawer interface {
+	// Withdraw withdraws funds to the specified address. Fees are subtracted
+	// from the value.
+	Withdraw(address string, value, feeSuggestion uint64) (Coin, error)
 }
 
 // Sweeper is a wallet that can clear the entire balance of the wallet/account

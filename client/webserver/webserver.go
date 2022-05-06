@@ -97,7 +97,7 @@ type clientCore interface {
 	GetDEXConfig(dexAddr string, certI interface{}) (*core.Exchange, error)
 	DiscoverAccount(dexAddr string, pass []byte, certI interface{}) (*core.Exchange, bool, error)
 	SupportedAssets() map[uint32]*core.SupportedAsset
-	Withdraw(pw []byte, assetID uint32, value uint64, address string) (asset.Coin, error)
+	SendOrWithdraw(pw []byte, assetID uint32, value uint64, address string, send bool) (asset.Coin, error)
 	Trade(pw []byte, form *core.TradeForm) (*core.Order, error)
 	Cancel(pw []byte, oid dex.Bytes) error
 	NotificationFeed() <-chan core.Notification
@@ -342,7 +342,7 @@ func New(cfg *Config) (*WebServer, error) {
 			apiAuth.Post("/walletsettings", s.apiWalletSettings)
 			apiAuth.Post("/orders", s.apiOrders)
 			apiAuth.Post("/order", s.apiOrder)
-			apiAuth.Post("/withdraw", s.apiWithdraw)
+			apiAuth.Post("/withdraw", s.apiSendOrWithdraw)
 			apiAuth.Post("/maxbuy", s.apiMaxBuy)
 			apiAuth.Post("/maxsell", s.apiMaxSell)
 			apiAuth.Post("/preorder", s.apiPreOrder)

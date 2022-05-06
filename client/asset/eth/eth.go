@@ -234,7 +234,9 @@ type ethFetcher interface {
 
 // Check that assetWallet satisfies the asset.Wallet interface.
 var _ asset.Wallet = (*ETHWallet)(nil)
+var _ asset.Sender = (*ETHWallet)(nil)
 var _ asset.Wallet = (*TokenWallet)(nil)
+var _ asset.Sender = (*TokenWallet)(nil)
 var _ asset.AccountLocker = (*ETHWallet)(nil)
 var _ asset.AccountLocker = (*TokenWallet)(nil)
 var _ asset.TokenMaster = (*ETHWallet)(nil)
@@ -2133,8 +2135,11 @@ func (w *assetWallet) SwapConfirmations(ctx context.Context, _ dex.Bytes, contra
 	return
 }
 
-// Withdraw withdraws funds to the specified address.
-func (w *ETHWallet) Withdraw(addr string, value, _ uint64) (asset.Coin, error) {
+// Send sends the exact value to the specified address.
+// This is different from Withdraw, which subtracts the
+// tx fees from the amount sent.
+// Satisfies asset.Sender.
+func (w *ETHWallet) Send(addr string, value, _ uint64) (asset.Coin, error) {
 	bal, err := w.Balance()
 	if err != nil {
 		return nil, err
@@ -2165,24 +2170,20 @@ func (w *ETHWallet) Withdraw(addr string, value, _ uint64) (asset.Coin, error) {
 	return &coin{id: txHash, value: value}, nil
 }
 
-// Withdraw withdraws funds to the specified address.
-func (w *TokenWallet) Withdraw(addr string, value, _ uint64) (asset.Coin, error) {
+// Send sends the exact value to the specified address.
+// This is different from Withdraw, which subtracts the
+// tx fees from the amount sent.
+// Satisfies asset.Sender.
+func (w *TokenWallet) Send(addr string, value, _ uint64) (asset.Coin, error) {
 	bal, err := w.Balance()
 	if err != nil {
 		return nil, err
 	}
 	avail := bal.Available
 	if avail < value {
-		return nil, fmt.Errorf("not enough funds to withdraw: have %d gwei need %d gwei", avail, value)
-	}
-	maxFeeRate, err := w.recommendedMaxFeeRate(w.ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error getting max fee rate: %v", err)
+		return nil, fmt.Errorf("not enough funds to tokens: have %d gwei need %d gwei", avail, value)
 	}
 
-	if avail < value {
-		return nil, fmt.Errorf("not enough tokens: have %d gwei need %d gwei", avail, value)
-	}
 	ethBal, err := w.parent.Balance()
 	if err != nil {
 		return nil, fmt.Errorf("error getting base chain balance: %w", err)
@@ -2191,6 +2192,11 @@ func (w *TokenWallet) Withdraw(addr string, value, _ uint64) (asset.Coin, error)
 	g := w.gases(contractVersionNewest)
 	if g == nil {
 		return nil, fmt.Errorf("gas table not found")
+	}
+
+	maxFeeRate, err := w.recommendedMaxFeeRate(w.ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error getting max fee rate: %v", err)
 	}
 
 	maxFee := dexeth.WeiToGwei(maxFeeRate) * g.Transfer
