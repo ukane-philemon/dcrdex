@@ -127,7 +127,7 @@ func (c *TCore) User() *core.User { return nil }
 func (c *TCore) SupportedAssets() map[uint32]*core.SupportedAsset {
 	return make(map[uint32]*core.SupportedAsset)
 }
-func (c *TCore) Withdraw(pw []byte, assetID uint32, value uint64, address string) (asset.Coin, error) {
+func (c *TCore) SendOrWithdraw(pw []byte, assetID uint32, value uint64, address string, send bool) (asset.Coin, error) {
 	return &tCoin{id: []byte{0xde, 0xc7, 0xed}}, c.withdrawErr
 }
 func (c *TCore) Trade(pw []byte, form *core.TradeForm) (*core.Order, error) {
@@ -419,7 +419,7 @@ func TestAPILogin(t *testing.T) {
 	tCore.loginErr = nil
 }
 
-func TestAPIWithdraw(t *testing.T) {
+func TestAPISendOrWithdraw(t *testing.T) {
 	writer := new(TWriter)
 	var body interface{}
 	reader := new(TReader)
@@ -432,7 +432,7 @@ func TestAPIWithdraw(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error creating request: %v", err)
 		}
-		s.apiWithdraw(writer, req)
+		s.apiSendOrWithdraw(writer, req)
 		if len(writer.b) == 0 {
 			t.Fatalf("no response")
 		}
@@ -444,7 +444,7 @@ func TestAPIWithdraw(t *testing.T) {
 		return resp.OK
 	}
 
-	body = &withdrawForm{
+	body = &sendOrWithdrawForm{
 		Pass: encode.PassBytes("dummyAppPass"),
 	}
 

@@ -3187,14 +3187,22 @@ func testPayFee(t *testing.T, assetID uint32) {
 	}
 }
 
-func TestWithdraw(t *testing.T) {
-	t.Run("eth", func(t *testing.T) { testWithdraw(t, BipID) })
-	t.Run("token", func(t *testing.T) { testWithdraw(t, testTokenID) })
+func TestSend(t *testing.T) {
+	t.Run("eth", func(t *testing.T) { testSend(t, BipID) })
+	t.Run("token", func(t *testing.T) { testSend(t, testTokenID) })
 }
 
-func testWithdraw(t *testing.T, assetID uint32) {
+func testSend(t *testing.T, assetID uint32) {
 	w, eth, node, shutdown := tassetWallet(assetID)
 	defer shutdown()
+
+	sender, isSender := w.(asset.Sender)
+	if !isSender {
+		t.Fatal("wallet is expected to support sending")
+	}
+	if _, isWithdrawer := w.(asset.Withdrawer); isWithdrawer {
+		t.Fatal("wallet is not expected to support withdrawal")
+	}
 
 	tx := tTx(0, 0, 0, &testAddressA, nil)
 	txHash := tx.Hash()
@@ -3207,7 +3215,6 @@ func testWithdraw(t *testing.T, assetID uint32) {
 	tokenFees := dexeth.WeiToGwei(maxFeeRate) * tokenGases.Transfer
 
 	const val = 10e9
-
 	tests := []struct {
 		name              string
 		sendAdj, feeAdj   uint64
@@ -3245,8 +3252,7 @@ func testWithdraw(t *testing.T, assetID uint32) {
 			node.tokenContractor.bal = dexeth.GweiToWei(val - test.sendAdj)
 			node.bal = dexeth.GweiToWei(tokenFees - test.feeAdj)
 		}
-
-		coin, err := w.Withdraw("", val, 0)
+		coin, err := sender.Send("", val, 0)
 		if test.wantErr {
 			if err == nil {
 				t.Fatalf("expected error for test %v", test.name)

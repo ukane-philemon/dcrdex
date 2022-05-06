@@ -522,15 +522,31 @@ func Run(t *testing.T, cfg *Config) {
 	}
 	tLogger.Infof("Fee paid with %s", coin.String())
 
-	tLogger.Info("Testing Withdraw")
-
-	// Test Withdraw
-	coin, err = rig.secondWallet.Withdraw(address, cfg.LotSize, 100)
-	if err != nil {
-		t.Fatalf("error withdrawing: %v", err)
+	// Test Withdraw.
+	if withdrawer, isWithdrawer := rig.secondWallet.Wallet.(asset.Withdrawer); isWithdrawer {
+		tLogger.Info("Testing Withdraw")
+		coin, err = withdrawer.Withdraw(address, cfg.LotSize, 100)
+		if err != nil {
+			t.Fatalf("error withdrawing: %v", err)
+		}
+		if coin.Value() == cfg.LotSize || coin.Value() > cfg.LotSize {
+			t.Fatalf("Expected %d got %d", cfg.LotSize, coin.Value())
+		}
+		tLogger.Infof("Withdrew with %s", coin.String())
 	}
-	tLogger.Infof("Withdrew with %s", coin.String())
 
+	// Test Send.
+	if sender, isSender := rig.secondWallet.Wallet.(asset.Sender); isSender {
+		tLogger.Info("Testing Send")
+		coin, err = sender.Send(address, cfg.LotSize, 100)
+		if err != nil {
+			t.Fatalf("error sending: %v", err)
+		}
+		if coin.Value() != cfg.LotSize {
+			t.Fatalf("Expected %d got %d", cfg.LotSize, coin.Value())
+		}
+		tLogger.Infof("Sent with %s", coin.String())
+	}
 	if cfg.SPV {
 		mine()
 	}

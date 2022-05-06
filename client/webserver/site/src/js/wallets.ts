@@ -181,7 +181,7 @@ export default class WalletsPage extends BasePage {
         f(assetID, asset)
       }
       bind(a.connect, 'click', e => { run(e, this.doConnect.bind(this)) })
-      bind(a.withdraw, 'click', e => { run(e, this.showWithdraw.bind(this)) })
+      bind(a.withdraw, 'click', e => { run(e, this.showSendOrWithdraw.bind(this)) })
       bind(a.deposit, 'click', e => { run(e, this.showDeposit.bind(this)) })
       bind(a.create, 'click', e => { run(e, this.showNewWallet.bind(this)) })
       bind(a.rescan, 'click', e => { run(e, this.rescanWallet.bind(this)) })
@@ -198,6 +198,7 @@ export default class WalletsPage extends BasePage {
     bind(page.withdrawAvail, 'click', () => {
       const asset = this.withdrawAsset
       page.withdrawAmt.value = String(asset.wallet.balance.available / asset.info.unitinfo.conventional.conversionFactor)
+      page.sendCheckBox.checked = false
     })
 
     // A link on the wallet reconfiguration form to show/hide the password field.
@@ -502,17 +503,35 @@ export default class WalletsPage extends BasePage {
     page.qrcode.src = `/generateqrcode?address=${res.address}`
   }
 
-  /* Show the form to withdraw funds. */
-  async showWithdraw (assetID: number) {
+  /* Show the form to either send or withdraw funds. */
+  async showSendOrWithdraw (assetID: number) {
     const page = this.page
     const box = page.withdrawForm
     const asset = this.withdrawAsset = app().assets[assetID]
     this.lastFormAsset = assetID
     const wallet = app().walletMap[assetID]
     if (!wallet) {
-      app().notify(ntfn.make('Cannot withdraw.', `No wallet found for ${asset.info.name}`, ntfn.ERROR))
+      app().notify(ntfn.make('Cannot send/withdraw.', `No wallet found for ${asset.info.name}`, ntfn.ERROR))
     }
     await this.hideBox()
+
+    Doc.hide(page.senderHelpText)
+    Doc.hide(page.withdrawerHelpText)
+    Doc.hide(page.toggleSend)
+    page.sendCheckBox.checked = false
+
+    const isSender = (wallet.traits & traitSender) !== 0
+    const isWithdrawer = (wallet.traits & traitWithdrawer) !== 0
+    if (isWithdrawer && isSender) {
+      Doc.show(page.toggleSend)
+    } else if (isWithdrawer) {
+      Doc.show(page.withdrawerHelpText)
+    } else if (isSender) {
+      Doc.show(page.senderHelpText)
+      // Auto check checkbox for send.
+      page.sendCheckBox.checked = true
+    }
+
     page.withdrawAddr.value = ''
     page.withdrawAmt.value = ''
     page.withdrawPW.value = ''
@@ -568,10 +587,12 @@ export default class WalletsPage extends BasePage {
     const page = this.page
     Doc.hide(page.withdrawErr)
     const assetID = parseInt(page.withdrawForm.dataset.assetID || '')
+    const send = page.sendCheckBox.checked || false
     const conversionFactor = app().unitInfo(assetID).conventional.conversionFactor
     const open = {
       assetID: assetID,
       address: page.withdrawAddr.value,
+      send: send,
       value: Math.round(parseFloat(page.withdrawAmt.value || '') * conversionFactor),
       pw: page.withdrawPW.value
     }

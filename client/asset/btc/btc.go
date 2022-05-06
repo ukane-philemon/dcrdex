@@ -3432,12 +3432,7 @@ func (btc *baseWallet) NewAddress() (string, error) {
 // PayFee sends the dex registration fee. Transaction fees are in addition to
 // the registration fee, and the fee rate is taken from the DEX configuration.
 func (btc *baseWallet) PayFee(address string, regFee, feeRate uint64) (asset.Coin, error) {
-	txHash, vout, sent, err := btc.send(address, regFee, btc.feeRateWithFallback(feeRate), false)
-	if err != nil {
-		btc.log.Errorf("PayFee error - address = '%s', fee = %s: %v", address, amount(regFee), err)
-		return nil, err
-	}
-	return newOutput(txHash, vout, sent), nil
+	return btc.Send(address, regFee, feeRate)
 }
 
 // EstimateRegistrationTxFee returns an estimate for the tx fee needed to
@@ -3451,11 +3446,25 @@ func (btc *baseWallet) EstimateRegistrationTxFee(feeRate uint64) uint64 {
 }
 
 // Withdraw withdraws funds to the specified address. Fees are subtracted from
-// the value. feeRate is in units of atoms/byte.
+// the value. feeRate is in units of sats/byte.
+// Withdraw satisfies asset.Withdrawer.
 func (btc *baseWallet) Withdraw(address string, value, feeRate uint64) (asset.Coin, error) {
 	txHash, vout, sent, err := btc.send(address, value, btc.feeRateWithFallback(feeRate), true)
 	if err != nil {
 		btc.log.Errorf("Withdraw error - address = '%s', amount = %s: %v", address, amount(value), err)
+		return nil, err
+	}
+	return newOutput(txHash, vout, sent), nil
+}
+
+// Send sends the exact value to the specified address.
+// This is different from Withdraw, which subtracts the
+// tx fees from the amount sent. feeRate is in units of sats/byte.
+// Send satisfies asset.Sender.
+func (btc *baseWallet) Send(address string, value, feeRate uint64) (asset.Coin, error) {
+	txHash, vout, sent, err := btc.send(address, value, btc.feeRateWithFallback(feeRate), false)
+	if err != nil {
+		btc.log.Errorf("Send error - address = '%s', amount = %s: %v", address, amount(value), err)
 		return nil, err
 	}
 	return newOutput(txHash, vout, sent), nil
@@ -3469,7 +3478,7 @@ func (btc *baseWallet) ValidateSecret(secret, secretHash []byte) bool {
 
 // send the value to the address, with the given fee rate. If subtract is true,
 // the fees will be subtracted from the value. If false, the fees are in
-// addition to the value. feeRate is in units of atoms/byte.
+// addition to the value. feeRate is in units of sats/byte.
 func (btc *baseWallet) send(address string, val uint64, feeRate uint64, subtract bool) (*chainhash.Hash, uint32, uint64, error) {
 	addr, err := btc.decodeAddr(address, btc.chainParams)
 	if err != nil {

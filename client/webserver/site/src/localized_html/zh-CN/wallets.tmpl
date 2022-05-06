@@ -160,6 +160,16 @@
           <!-- <div class="d-inline">tx fees: <span id="withdrawFee"></span> <span id="withdrawUnit"></span>/byte</div> -->
         </div>
       </div>
+      <div id="toggleSend" class="form-check pt-2">
+           <input class="form-check-input" type="checkbox" id="sendCheckBox">
+           <label for="sendCheckBox" class="form-label ps-1">Add network fees to withdraw amount. Ensure you have enough in your wallet to cover fees.</label>
+      </div>
+      <div id="senderHelpText" class="pt-2">
+      <p>The network fees will not be subtracted from the withdraw amount. Ensure you have enough in your wallet to cover fees.</p>
+      </div>
+      <div id="withdrawerHelpText" class="pt-2">
+        <p>The network fees will be subtracted from the withdraw amount.
+      </div>
       <hr class="dashed my-4">
       <div class="fs16 px-4 text-center">使用您的应用密码授权取款。</div>
       <div class="d-flex mt-3">

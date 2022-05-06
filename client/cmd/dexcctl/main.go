@@ -49,6 +49,7 @@ var promptPasswords = map[string][]string{
 	"register":     {"App password:"},
 	"trade":        {"App password:"},
 	"withdraw":     {"App password:"},
+	"send":         {"App password:"},
 	"appseed":      {"App password:"},
 }
 
