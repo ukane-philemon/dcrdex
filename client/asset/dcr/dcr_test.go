@@ -1994,6 +1994,7 @@ type tSenderType byte
 const (
 	tPayFeeSender tSenderType = iota
 	tWithdrawSender
+	tSendSender
 )
 
 func testSender(t *testing.T, senderType tSenderType) {
@@ -2015,6 +2016,14 @@ func testSender(t *testing.T, senderType tSenderType) {
 		unspentVal = sendVal
 		sender = func(addr string, val uint64) (asset.Coin, error) {
 			return wallet.Withdraw(addr, val, feeSuggestion)
+		}
+	}
+	if senderType == tSendSender {
+		const feeSuggestion = 100
+		funName = "Send"
+		// For Send.
+		sender = func(addr string, val uint64) (asset.Coin, error) {
+			return wallet.Send(addr, val, feeSuggestion)
 		}
 	}
 	addr := tPKHAddr.String()
@@ -2067,7 +2076,11 @@ func TestWithdraw(t *testing.T) {
 	testSender(t, tWithdrawSender)
 }
 
-func Test_sendMinusFees(t *testing.T) {
+func TestSend(t *testing.T) {
+	testSender(t, tSendSender)
+}
+
+func Test_send(t *testing.T) {
 	wallet, node, shutdown, err := tNewWallet()
 	defer shutdown()
 	if err != nil {
@@ -2091,8 +2104,10 @@ func Test_sendMinusFees(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Test Withdraw.
 	// This should make a msgTx with one input and one output.
-	msgTx, val, err := wallet.sendMinusFees(addr, unspentVal, optimalFeeRate)
+	msgTx, val, err := wallet.send(addr, unspentVal, optimalFeeRate, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2111,7 +2126,7 @@ func Test_sendMinusFees(t *testing.T) {
 	// SMALLER than requested because it was required for fees.
 	avail := unspentVal + 77
 	node.unspent[0].Amount = float64(avail) / 1e8
-	msgTx, val, err = wallet.sendMinusFees(addr, unspentVal, optimalFeeRate)
+	msgTx, val, err = wallet.send(addr, unspentVal, optimalFeeRate, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2129,7 +2144,7 @@ func Test_sendMinusFees(t *testing.T) {
 	// because change would be dust, and we don't over pay fees.
 	avail = unspentVal + 3000
 	node.unspent[0].Amount = float64(avail) / 1e8
-	msgTx, val, err = wallet.sendMinusFees(addr, unspentVal, optimalFeeRate)
+	msgTx, val, err = wallet.send(addr, unspentVal, optimalFeeRate, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2145,7 +2160,7 @@ func Test_sendMinusFees(t *testing.T) {
 	// should be exactly unspentVal and the sent amount should be
 	// unspentVal-fees.
 	node.unspent[0].Amount = float64(unspentVal*2) / 1e8
-	msgTx, val, err = wallet.sendMinusFees(addr, unspentVal, optimalFeeRate)
+	msgTx, val, err = wallet.send(addr, unspentVal, optimalFeeRate, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2157,6 +2172,29 @@ func Test_sendMinusFees(t *testing.T) {
 	}
 	if unspentVal != uint64(msgTx.TxOut[1].Value) {
 		t.Errorf("expected change output to be %d, got %d", unspentVal, msgTx.TxOut[1].Value)
+	}
+
+	// Test Send.
+	var sendVal uint64 = 10e8
+	node.unspent[0].Amount = float64(unspentVal) / 1e8
+	// This should return an error, not enough funds to send.
+	_, val, err = wallet.send(addr, unspentVal, optimalFeeRate, false)
+	if err == nil {
+		t.Log(val)
+		t.Fatal("Expected error, not enough funds to send.")
+	}
+
+	// With a lower send val send should be successful.
+	node.unspent[0].Amount = float64(unspentVal)
+	msgTx, val, err = wallet.send(addr, sendVal, optimalFeeRate, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val != uint64(msgTx.TxOut[0].Value) {
+		t.Errorf("expected non-change output to be %d, got %d", val, msgTx.TxOut[0].Value)
+	}
+	if val < sendVal {
+		t.Errorf("expected output to be %d, got %d", sendVal, val)
 	}
 }
 

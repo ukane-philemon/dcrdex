@@ -3903,7 +3903,7 @@ func (c *Core) feeSuggestion(dc *dexConnection, assetID uint32) (feeSuggestion u
 
 // Withdraw initiates a withdraw from an exchange wallet. The client password
 // must be provided as an additional verification.
-func (c *Core) Withdraw(pw []byte, assetID uint32, value uint64, address string) (asset.Coin, error) {
+func (c *Core) Withdraw(pw []byte, assetID uint32, value uint64, address string, send bool) (asset.Coin, error) {
 	crypter, err := c.encryptionKey(pw)
 	if err != nil {
 		return nil, fmt.Errorf("Withdraw password error: %w", err)
@@ -3920,8 +3920,26 @@ func (c *Core) Withdraw(pw []byte, assetID uint32, value uint64, address string)
 	if err != nil {
 		return nil, err
 	}
+	var coin asset.Coin
 	feeSuggestion := c.feeSuggestionAny(assetID)
-	coin, err := wallet.Withdraw(address, value, feeSuggestion)
+	if send {
+		// Check if wallet implements asset.Sender.
+		sender, isSender := wallet.Wallet.(asset.Sender)
+		if isSender {
+			coin, err = sender.Send(address, value, feeSuggestion)
+		} else {
+			return nil, fmt.Errorf("wallet does not support sending")
+		}
+	} else if !send {
+		// Check if wallet implements assest.Withdrawer
+		withdrawer, isWithdrawer := wallet.Wallet.(asset.Withdrawer)
+		if isWithdrawer {
+			coin, err = withdrawer.Withdraw(address, value, feeSuggestion)
+		} else {
+			return nil, fmt.Errorf("wallet does not support withdrawing")
+		}
+	}
+
 	if err != nil {
 		subject, details := c.formatDetails(TopicWithdrawError, unbip(assetID), err)
 		c.notify(newWithdrawNote(TopicWithdrawError, subject, details, db.ErrorLevel))

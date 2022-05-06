@@ -753,6 +753,7 @@ func TestHandleWithdraw(t *testing.T) {
 			"42",
 			"1000",
 			"abc",
+			"false",
 		},
 	}
 	tests := []struct {

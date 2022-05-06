@@ -157,6 +157,8 @@ export interface WalletState {
   encrypted: boolean
   peerCount: number
   synced: boolean
+  isSender: boolean
+  isWithdrawer: boolean
   syncProgress: number
 }
 

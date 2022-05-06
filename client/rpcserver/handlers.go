@@ -423,7 +423,7 @@ func handleWithdraw(s *RPCServer, params *RawParams) *msgjson.ResponsePayload {
 		return usage(withdrawRoute, err)
 	}
 	defer form.appPass.Clear()
-	coin, err := s.core.Withdraw(form.appPass, form.assetID, form.value, form.address)
+	coin, err := s.core.Withdraw(form.appPass, form.assetID, form.value, form.address, form.send)
 	if err != nil {
 		errMsg := fmt.Sprintf("unable to withdraw: %v", err)
 		resErr := msgjson.NewError(msgjson.RPCWithdrawError, errMsg)

@@ -141,6 +141,7 @@ type withdrawForm struct {
 	assetID uint32
 	value   uint64
 	address string
+	send    bool
 }
 
 // orderBookForm is information necessary to fetch an order book.
@@ -427,7 +428,7 @@ func parseCancelArgs(params *RawParams) (*cancelForm, error) {
 }
 
 func parseWithdrawArgs(params *RawParams) (*withdrawForm, error) {
-	if err := checkNArgs(params, []int{1}, []int{3}); err != nil {
+	if err := checkNArgs(params, []int{1}, []int{4}); err != nil {
 		return nil, err
 	}
 	assetID, err := checkUIntArg(params.Args[0], "assetID", 32)
@@ -438,11 +439,17 @@ func parseWithdrawArgs(params *RawParams) (*withdrawForm, error) {
 	if err != nil {
 		return nil, err
 	}
+	var send bool
+	send, err = checkBoolArg(params.Args[3], "send")
+	if err != nil {
+		return nil, err
+	}
 	req := &withdrawForm{
 		appPass: params.PWArgs[0],
 		assetID: uint32(assetID),
 		value:   value,
 		address: params.Args[2],
+		send:    send,
 	}
 	return req, nil
 }
