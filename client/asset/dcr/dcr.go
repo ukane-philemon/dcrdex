@@ -1451,16 +1451,16 @@ func (dcr *ExchangeWallet) split(value uint64, lots uint64, coins asset.Coins, i
 	dcr.fundingMtx.Lock()         // before generating the new output in sendCoins
 	defer dcr.fundingMtx.Unlock() // after locking it (wallet and map)
 
-	msgTx, net, err := dcr.sendCoins(addr, coins, reqFunds, splitFeeRate, false)
+	msgTx, sentVal, err := dcr.sendCoins(addr, coins, reqFunds, splitFeeRate, false)
 	if err != nil {
 		return nil, false, fmt.Errorf("error sending split transaction: %w", err)
 	}
 
-	if net != reqFunds {
-		dcr.log.Errorf("split - total sent %.8f does not match expected %.8f", toDCR(net), toDCR(reqFunds))
+	if sentVal != reqFunds {
+		dcr.log.Errorf("split - total sent %.8f does not match expected %.8f", toDCR(sentVal), toDCR(reqFunds))
 	}
 
-	op := newOutput(msgTx.CachedTxHash(), 0, net, wire.TxTreeRegular)
+	op := newOutput(msgTx.CachedTxHash(), 0, sentVal, wire.TxTreeRegular)
 
 	// Lock the funding coin.
 	err = dcr.lockFundingCoins([]*fundingCoin{{
@@ -2771,11 +2771,11 @@ func (dcr *ExchangeWallet) Withdraw(address string, value, feeRate uint64) (asse
 	if err != nil {
 		return nil, err
 	}
-	msgTx, net, err := dcr.sendMinusFees(addr, value, dcr.feeRateWithFallback(feeRate))
+	msgTx, sentVal, err := dcr.sendMinusFees(addr, value, dcr.feeRateWithFallback(feeRate))
 	if err != nil {
 		return nil, err
 	}
-	return newOutput(msgTx.CachedTxHash(), 0, net, wire.TxTreeRegular), nil
+	return newOutput(msgTx.CachedTxHash(), 0, sentVal, wire.TxTreeRegular), nil
 }
 
 // Send sends the exact value to the specified address.
@@ -2787,11 +2787,11 @@ func (dcr *ExchangeWallet) Send(address string, value, feeRate uint64) (asset.Co
 	if err != nil {
 		return nil, err
 	}
-	msgTx, net, err := dcr.sendToAddress(addr, value, dcr.feeRateWithFallback(feeRate))
+	msgTx, sentVal, err := dcr.sendToAddress(addr, value, dcr.feeRateWithFallback(feeRate))
 	if err != nil {
 		return nil, err
 	}
-	return newOutput(msgTx.CachedTxHash(), 0, net, wire.TxTreeRegular), nil
+	return newOutput(msgTx.CachedTxHash(), 0, sentVal, wire.TxTreeRegular), nil
 }
 
 // ValidateSecret checks that the secret satisfies the contract.
@@ -3049,7 +3049,13 @@ func (dcr *ExchangeWallet) sendCoins(addr stdaddr.Address, coins asset.Coins, va
 	}
 
 	tx, err := dcr.sendWithReturn(baseTx, feeRate, feeSource)
-	return tx, uint64(txOut.Value), err
+	if err != nil {
+		if retErr := dcr.returnCoins(coins); retErr != nil {
+			dcr.log.Errorf("Failed to unlock coins:%v", retErr)
+		}
+		return nil, 0, err
+	}
+	return tx, uint64(tx.TxOut[0].Value), err
 }
 
 // sendAll sends the maximum sendable amount (total input amount minus fees) to
@@ -3151,7 +3157,7 @@ func (dcr *ExchangeWallet) signTxAndAddChange(baseTx *wire.MsgTx, feeRate uint64
 
 	minFee := feeRate * size
 	if subtractFrom == -1 && minFee > remaining {
-		return nil, nil, "", 0, fmt.Errorf("not enough funds to cover minimum fee rate. %s < %s",
+		return nil, nil, "", 0, fmt.Errorf("not enough funds to cover minimum fee rate. %s > %s",
 			amount(minFee), amount(remaining))
 	}
 	if int(subtractFrom) >= len(baseTx.TxOut) {

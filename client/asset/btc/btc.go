@@ -1233,7 +1233,7 @@ func (btc *baseWallet) targetFeeRateWithFallback(confTarget, feeSuggestion uint6
 // logged.
 func (btc *baseWallet) feeRateWithFallback(feeSuggestion uint64) uint64 {
 	if feeSuggestion > 0 && feeSuggestion < btc.feeRateLimit {
-		btc.log.Tracef("feeRateWithFallback using caller's suggestion for fee rate, %d. Local estimate unavailable",
+		btc.log.Tracef("feeRateWithFallback using caller's suggestion for fee rate, %d.",
 			feeSuggestion)
 		return feeSuggestion
 	}
@@ -1323,7 +1323,7 @@ func (btc *baseWallet) PreSwap(req *asset.PreSwapForm) (*asset.PreSwap, error) {
 	}
 
 	// Parse the configured fee bump.
-	var bump float64 = 1.0
+	bump := 1.0
 	if customCfg.FeeBump != nil {
 		bump = *customCfg.FeeBump
 		if bump > 2.0 {
@@ -1558,7 +1558,7 @@ func (btc *baseWallet) PreRedeem(req *asset.PreRedeemForm) (*asset.PreRedeem, er
 	}
 
 	// Parse the configured fee bump.
-	var currentBump float64 = 1.0
+	currentBump := 1.0
 	if customCfg.FeeBump != nil {
 		bump := *customCfg.FeeBump
 		if bump < 1.0 || bump > 2.0 {
