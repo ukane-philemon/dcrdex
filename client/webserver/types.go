@@ -83,6 +83,7 @@ type withdrawForm struct {
 	AssetID uint32           `json:"assetID"`
 	Value   uint64           `json:"value"`
 	Address string           `json:"address"`
+	Send    bool             `json:"send"`
 	Pass    encode.PassBytes `json:"pw"`
 }
 

@@ -168,10 +168,14 @@ func (w *xcWallet) state() *WalletState {
 	w.mtx.RLock()
 	defer w.mtx.RUnlock()
 	winfo := w.Info()
+	_, isSender := w.Wallet.(asset.Sender)
+	_, isWithdrawer := w.Wallet.(asset.Withdrawer)
 	return &WalletState{
 		Symbol:       unbip(w.AssetID),
 		AssetID:      w.AssetID,
 		Version:      winfo.Version,
+		WalletType:   w.walletType,
+		Traits:       w.traits,
 		Open:         len(w.encPass) == 0 || len(w.pw) > 0,
 		Running:      w.connector.On(),
 		Balance:      w.balance,
@@ -179,10 +183,10 @@ func (w *xcWallet) state() *WalletState {
 		Units:        winfo.UnitInfo.AtomicUnit,
 		Encrypted:    len(w.encPass) > 0,
 		PeerCount:    w.peerCount,
+		IsSender:     isSender,
+		IsWithdrawer: isWithdrawer,
 		Synced:       w.synced,
 		SyncProgress: w.syncProgress,
-		WalletType:   w.walletType,
-		Traits:       w.traits,
 	}
 }
 

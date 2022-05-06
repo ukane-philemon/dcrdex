@@ -107,6 +107,8 @@ type WalletState struct {
 	Encrypted    bool              `json:"encrypted"`
 	PeerCount    uint32            `json:"peerCount"`
 	Synced       bool              `json:"synced"`
+	IsSender     bool              `json:"isSender"`
+	IsWithdrawer bool              `json:"isWithdrawer"`
 	SyncProgress float32           `json:"syncProgress"`
 }
 

@@ -95,7 +95,7 @@ type clientCore interface {
 	GetDEXConfig(dexAddr string, certI interface{}) (*core.Exchange, error)
 	DiscoverAccount(dexAddr string, pass []byte, certI interface{}) (*core.Exchange, bool, error)
 	SupportedAssets() map[uint32]*core.SupportedAsset
-	Withdraw(pw []byte, assetID uint32, value uint64, address string) (asset.Coin, error)
+	Withdraw(pw []byte, assetID uint32, value uint64, address string, send bool) (asset.Coin, error)
 	Trade(pw []byte, form *core.TradeForm) (*core.Order, error)
 	Cancel(pw []byte, oid dex.Bytes) error
 	NotificationFeed() <-chan core.Notification

@@ -615,6 +615,8 @@ type ExchangeWalletFullNode struct {
 // Check that wallets satisfy their supported interfaces.
 
 var _ asset.Wallet = (*baseWallet)(nil)
+var _ asset.Sender = (*baseWallet)(nil)
+var _ asset.Withdrawer = (*baseWallet)(nil)
 var _ asset.Rescanner = (*ExchangeWalletSPV)(nil)
 var _ asset.FeeRater = (*ExchangeWalletFullNode)(nil)
 var _ asset.LogFiler = (*ExchangeWalletSPV)(nil)
@@ -2773,10 +2775,23 @@ func (btc *baseWallet) EstimateRegistrationTxFee(feeRate uint64) uint64 {
 
 // Withdraw withdraws funds to the specified address. Fees are subtracted from
 // the value. feeRate is in units of atoms/byte.
+// Satisfies asset.Withdrawer.
 func (btc *baseWallet) Withdraw(address string, value, feeRate uint64) (asset.Coin, error) {
 	txHash, vout, sent, err := btc.send(address, value, btc.feeRateWithFallback(feeRate), true)
 	if err != nil {
 		btc.log.Errorf("Withdraw error - address = '%s', amount = %s: %v", address, amount(value), err)
+		return nil, err
+	}
+	return newOutput(txHash, vout, sent), nil
+}
+
+// Send sends funds to the specified address. Fees are in
+// addition to the value. feeRate is in units of sats/byte.
+// Send satisfies asset.Sender.
+func (btc *baseWallet) Send(address string, value, feeRate uint64) (asset.Coin, error) {
+	txHash, vout, sent, err := btc.send(address, value, btc.feeRateWithFallback(feeRate), false)
+	if err != nil {
+		btc.log.Errorf("Send error - address = '%s', amount = %s: %v", address, amount(value), err)
 		return nil, err
 	}
 	return newOutput(txHash, vout, sent), nil
@@ -2790,7 +2805,7 @@ func (btc *baseWallet) ValidateSecret(secret, secretHash []byte) bool {
 
 // send the value to the address, with the given fee rate. If subtract is true,
 // the fees will be subtracted from the value. If false, the fees are in
-// addition to the value. feeRate is in units of atoms/byte.
+// addition to the value. feeRate is in units of sats/byte.
 func (btc *baseWallet) send(address string, val uint64, feeRate uint64, subtract bool) (*chainhash.Hash, uint32, uint64, error) {
 	addr, err := btc.decodeAddr(address, btc.chainParams)
 	if err != nil {

@@ -303,9 +303,6 @@ type Wallet interface {
 	// The contract and matchTime are provided so that wallets may search for
 	// the coin using light filters.
 	SwapConfirmations(ctx context.Context, coinID dex.Bytes, contract dex.Bytes, matchTime time.Time) (confs uint32, spent bool, err error)
-	// Withdraw withdraws funds to the specified address. Fees are subtracted
-	// from the value.
-	Withdraw(address string, value, feeRate uint64) (Coin, error)
 	// ValidateSecret checks that the secret hashes to the secret hash.
 	ValidateSecret(secret, secretHash []byte) bool
 	// SyncStatus is information about the blockchain sync status. It should
@@ -330,6 +327,12 @@ type Rescanner interface {
 // withdrawing a certain amount from the source wallet/account.
 type Sender interface {
 	Send(address string, value, feeSuggestion uint64) (Coin, error)
+}
+
+// Withdraw withdraws funds to the specified address. Fees are subtracted
+// from the value.
+type Withdrawer interface {
+	Withdraw(address string, value, feeSuggestion uint64) (Coin, error)
 }
 
 // Sweeper is a wallet that can clear the entire balance of the wallet/account

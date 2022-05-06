@@ -169,6 +169,7 @@ export default class WalletsPage extends BasePage {
     bind(page.withdrawAvail, 'click', () => {
       const asset = this.withdrawAsset
       page.withdrawAmt.value = String(asset.wallet.balance.available / asset.info.unitinfo.conventional.conversionFactor)
+      page.send.checked = false
     })
 
     // A link on the wallet reconfiguration form to show/hide the password field.
@@ -447,6 +448,20 @@ export default class WalletsPage extends BasePage {
       app().notify(ntfn.make('Cannot withdraw.', `No wallet found for ${asset.info.name}`, ntfn.ERROR))
     }
     await this.hideBox()
+    Doc.hide(page.senderHelpText)
+    Doc.hide(page.withdrawerHelpText)
+    Doc.hide(page.toggleSend)
+    page.sendCheckBox.checked = false
+
+    if (wallet.isSender && wallet.isWithdrawer) {
+      Doc.show(page.toggleSend)
+    } else if (wallet.isSender) {
+      Doc.show(page.senderHelpText)
+      page.sendCheckBox.checked = true
+    } else if (wallet.isWithdrawer) {
+      Doc.show(page.withdrawerHelpText)
+    }
+
     page.withdrawAddr.value = ''
     page.withdrawAmt.value = ''
     page.withdrawPW.value = ''
@@ -502,10 +517,12 @@ export default class WalletsPage extends BasePage {
     const page = this.page
     Doc.hide(page.withdrawErr)
     const assetID = parseInt(page.withdrawForm.dataset.assetID || '')
+    const send = page.sendCheckBox.checked || false
     const conversionFactor = app().unitInfo(assetID).conventional.conversionFactor
     const open = {
       assetID: assetID,
       address: page.withdrawAddr.value,
+      send: send,
       value: Math.round(parseFloat(page.withdrawAmt.value || '') * conversionFactor),
       pw: page.withdrawPW.value
     }

@@ -530,6 +530,7 @@ func TestParseWithdrawArgs(t *testing.T) {
 			id,
 			value,
 			"abc",
+			"false",
 		}
 		return &RawParams{PWArgs: pwArgs, Args: args}
 	}

@@ -419,6 +419,8 @@ type ExchangeWallet struct {
 // Check that ExchangeWallet satisfies the Wallet interface.
 var _ asset.Wallet = (*ExchangeWallet)(nil)
 var _ asset.FeeRater = (*ExchangeWallet)(nil)
+var _ asset.Sender = (*ExchangeWallet)(nil)
+var _ asset.Sender = (*ExchangeWallet)(nil)
 
 type block struct {
 	height int64
@@ -2559,12 +2561,28 @@ func (dcr *ExchangeWallet) EstimateRegistrationTxFee(feeRate uint64) uint64 {
 
 // Withdraw withdraws funds to the specified address. Fees are subtracted from
 // the value.
+// Satisfies asset.Withdrawer.
 func (dcr *ExchangeWallet) Withdraw(address string, value, feeRate uint64) (asset.Coin, error) {
 	addr, err := stdaddr.DecodeAddress(address, dcr.chainParams)
 	if err != nil {
 		return nil, err
 	}
-	msgTx, net, err := dcr.sendMinusFees(addr, value, dcr.feeRateWithFallback(feeRate))
+	msgTx, net, err := dcr.send(addr, value, dcr.feeRateWithFallback(feeRate), true)
+	if err != nil {
+		return nil, err
+	}
+	return newOutput(msgTx.CachedTxHash(), 0, net, wire.TxTreeRegular), nil
+}
+
+// Send sends funds to the specified address. Fees are in
+// addition to the value. feeRate is in units of atoms/byte.
+// Send satisfies asset.Sender.
+func (dcr *ExchangeWallet) Send(address string, value, feeRate uint64) (asset.Coin, error) {
+	addr, err := stdaddr.DecodeAddress(address, dcr.chainParams)
+	if err != nil {
+		return nil, err
+	}
+	msgTx, net, err := dcr.send(addr, value, dcr.feeRateWithFallback(feeRate), false)
 	if err != nil {
 		return nil, err
 	}
@@ -2766,9 +2784,9 @@ func (dcr *ExchangeWallet) convertCoin(coin asset.Coin) (*output, error) {
 	return newOutput(txHash, vout, coin.Value(), wire.TxTreeUnknown), nil
 }
 
-// sendMinusFees sends the amount to the address. Fees are subtracted from the
-// sent value.
-func (dcr *ExchangeWallet) sendMinusFees(addr stdaddr.Address, val, feeRate uint64) (*wire.MsgTx, uint64, error) {
+// send sends the amount to the address. If minusFees is false, fee is added
+// to the amount.
+func (dcr *ExchangeWallet) send(addr stdaddr.Address, val, feeRate uint64, minusFees bool) (*wire.MsgTx, uint64, error) {
 	if val == 0 {
 		return nil, 0, fmt.Errorf("cannot send value = 0")
 	}
@@ -2780,7 +2798,7 @@ func (dcr *ExchangeWallet) sendMinusFees(addr stdaddr.Address, val, feeRate uint
 		return nil, 0, fmt.Errorf("unable to send %s DCR to address %s with feeRate %d atoms/byte: %w",
 			amount(val), addr, feeRate, err)
 	}
-	return dcr.sendCoins(addr, coins, val, feeRate, true)
+	return dcr.sendCoins(addr, coins, val, feeRate, minusFees)
 }
 
 // sendRegFee sends the registration fee to the address. Transaction fees will
