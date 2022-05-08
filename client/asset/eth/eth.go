@@ -1653,6 +1653,13 @@ func (w *ETHWallet) ReReserveRedemption(req uint64) error {
 // ReReserveRedemption checks out an amount for redemptions. Use
 // ReReserveRedemption after initializing a new asset.Wallet.
 // Part of the AccountLocker interface.
+func (w *ETHWallet) ReReserveRedemption(req uint64) error {
+	return w.lockFunds(req, redemptionReserve)
+}
+
+// ReReserveRedemption checks out an amount for redemptions. Use
+// ReReserveRedemption after initializing a new asset.Wallet.
+// Part of the AccountLocker interface.
 func (w *TokenWallet) ReReserveRedemption(req uint64) error {
 	return w.parent.lockFunds(req, redemptionReserve)
 }
@@ -2159,6 +2166,48 @@ func (w *ETHWallet) Send(addr string, value, _ uint64) (asset.Coin, error) {
 	// if avail < value+maxFee {
 	// 	value -= maxFee
 	// }
+
+	tx, err := w.sendToAddr(common.HexToAddress(addr), value, maxFeeRate)
+	if err != nil {
+		return nil, err
+	}
+	txHash := tx.Hash()
+	return &coin{id: txHash, value: value}, nil
+}
+
+// Withdraw withdraws funds to the specified address.
+func (w *TokenWallet) Withdraw(addr string, value, _ uint64) (asset.Coin, error) {
+	bal, err := w.Balance()
+	if err != nil {
+		return nil, err
+	}
+	avail := bal.Available
+	if avail < value {
+		return nil, fmt.Errorf("not enough funds to withdraw: have %d gwei need %d gwei", avail, value)
+	}
+	maxFeeRate, err := w.recommendedMaxFeeRate(w.ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error getting max fee rate: %v", err)
+	}
+
+	if avail < value {
+		return nil, fmt.Errorf("not enough tokens: have %d gwei need %d gwei", avail, value)
+	}
+	ethBal, err := w.parent.Balance()
+	if err != nil {
+		return nil, fmt.Errorf("error getting base chain balance: %w", err)
+	}
+
+	g := w.gases(contractVersionNewest)
+	if g == nil {
+		return nil, fmt.Errorf("gas table not found")
+	}
+
+	maxFee := dexeth.WeiToGwei(maxFeeRate) * g.Transfer
+	if ethBal.Available < maxFee {
+		return nil, fmt.Errorf("insufficient balance to cover token transfer fees. %d < %d",
+			ethBal.Available, maxFee)
+	}
 
 	tx, err := w.sendToAddr(common.HexToAddress(addr), value, maxFeeRate)
 	if err != nil {
