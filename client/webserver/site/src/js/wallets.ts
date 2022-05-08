@@ -536,6 +536,7 @@ export default class WalletsPage extends BasePage {
     page.withdrawAmt.value = ''
     page.withdrawPW.value = ''
 
+    page.withdrawErr.textContent = ''
     page.withdrawAvail.textContent = Doc.formatFullPrecision(wallet.balance.available, asset.info.unitinfo)
     page.withdrawLogo.src = Doc.logoPath(asset.symbol)
     page.withdrawName.textContent = asset.info.name
