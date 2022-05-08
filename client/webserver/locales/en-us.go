@@ -237,4 +237,9 @@ var EnUS = map[string]string{
 	"Update TLS Certificate":                 "Update TLS Certificate",
 	"registered dexes":                       "Registered Dexes:",
 	"successful_cert_update":                 "Successfully updated certificate!",
+	"estimated_transaction_fee":              "Estimated Transaction Fee",
+	"estimated_total_spend":                  "Estimated Total Spend",
+	"estimated_balance":                      "Estimated Balance",
+	"sending":                                "Sending",
+	"confirm_send":                           "Confirm Send",
 }

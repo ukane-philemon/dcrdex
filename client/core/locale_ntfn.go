@@ -67,7 +67,7 @@ var enUS = map[Topic]*translation{
 	// [ticker, coin ID]
 	TopicSendSucess: {
 		subject:  "Send Successful",
-		template: "Sending %s has completed successfully. Coin ID = %s",
+		template: "Sending %d %s has completed successfully. Coin ID = %s",
 	},
 	// [error]
 	TopicOrderLoadFailure: {
@@ -352,7 +352,7 @@ var ptBR = map[Topic]*translation{
 	},
 	// [ticker, coin ID]
 	TopicSendSucess: {
-		template: "Retirada de %s foi completada com sucesso. ID da moeda = %s",
+		template: "Retirada de %d %s foi completada com sucesso. ID da moeda = %s",
 		subject:  "Retirada Enviada",
 	},
 	// [error]
@@ -640,7 +640,7 @@ var zhCN = map[Topic]*translation{
 	// [ticker, coin ID]
 	TopicSendSucess: {
 		subject:  "提款已发送",
-		template: "%s 的提款已成功完成。硬币 ID = %s",
+		template: "%d %s 的提款已成功完成。硬币 ID = %s",
 	},
 	// [error]
 	TopicOrderLoadFailure: {
@@ -926,7 +926,7 @@ var plPL = map[Topic]*translation{
 	// [ticker, coin ID]
 	TopicSendSucess: {
 		subject:  "Wypłata zrealizowana",
-		template: "Wypłata %s została zrealizowana pomyślnie. ID monety = %s",
+		template: "Wypłata %d %s została zrealizowana pomyślnie. ID monety = %s",
 	},
 	// [error]
 	TopicOrderLoadFailure: {

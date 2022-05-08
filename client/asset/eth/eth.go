@@ -2007,6 +2007,23 @@ func (w *ETHWallet) EstimateRegistrationTxFee(feeRate uint64) uint64 {
 
 }
 
+// EstimateSendFee returns an estimated fee needed to either send or
+// withdraw.
+func (w *ETHWallet) EstimateSendFee(_ string, _, feeRate uint64, _ bool) (fee uint64, err error) {
+	return feeRate * defaultSendGasLimit, nil
+}
+
+// EstimateSendFee returns an estimated fee needed to either send or
+// withdraw.
+func (w *TokenWallet) EstimateSendFee(_ string, _, feeRate uint64, _ bool) (fee uint64, err error) {
+	g := w.gases(contractVersionNewest)
+	if g == nil {
+		w.log.Errorf("no gas table")
+		return math.MaxUint64, nil
+	}
+	return g.Transfer * feeRate, nil
+}
+
 // EstimateRegistrationTxFee returns an estimate for the tx fee needed to
 // pay the registration fee using the provided feeRate.
 func (w *TokenWallet) EstimateRegistrationTxFee(feeRate uint64) uint64 {

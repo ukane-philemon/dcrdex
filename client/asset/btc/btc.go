@@ -2219,7 +2219,7 @@ func (btc *baseWallet) signedAccelerationTx(previousTxs []*GetTransactionResult,
 		return makeError(fmt.Errorf("error creating change address: %w", err))
 	}
 
-	tx, output, txFee, err := btc.signTxAndAddChange(baseTx, changeAddr, totalIn, additionalFeesRequired, newFeeRate)
+	tx, output, txFee, err := btc.signTxAndAddChange(baseTx, changeAddr, totalIn, additionalFeesRequired, newFeeRate, -1) //-1 take fee from change
 	if err != nil {
 		return makeError(err)
 	}
@@ -2669,7 +2669,7 @@ func (btc *baseWallet) Swap(swaps *asset.Swaps) ([]asset.Receipt, asset.Coin, ui
 
 	// Sign, add change, but don't send the transaction yet until
 	// the individual swap refund txs are prepared and signed.
-	msgTx, change, fees, err := btc.signTxAndAddChange(baseTx, changeAddr, totalIn, totalOut, feeRate)
+	msgTx, change, fees, err := btc.signTxAndAddChange(baseTx, changeAddr, totalIn, totalOut, feeRate, -1) // -1 subtract fee from change.
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -3871,7 +3871,7 @@ func (btc *baseWallet) convertCoin(coin asset.Coin) (*output, error) {
 func (btc *baseWallet) sendWithReturn(baseTx *wire.MsgTx, addr btcutil.Address,
 	totalIn, totalOut, feeRate uint64) (*wire.MsgTx, error) {
 
-	signedTx, _, _, err := btc.signTxAndAddChange(baseTx, addr, totalIn, totalOut, feeRate)
+	signedTx, _, _, err := btc.signTxAndAddChange(baseTx, addr, totalIn, totalOut, feeRate, -1) // -1 subtract fee from change.
 	if err != nil {
 		return nil, err
 	}
@@ -3881,9 +3881,11 @@ func (btc *baseWallet) sendWithReturn(baseTx *wire.MsgTx, addr btcutil.Address,
 }
 
 // signTxAndAddChange signs the passed tx and adds a change output if the change
-// wouldn't be dust. Returns but does NOT broadcast the signed tx.
+// wouldn't be dust. Returns but does NOT broadcast the signed tx. subtractFrom
+// indicates the output from which fees should be subtracted, where -1 indicates
+// fees should come out of a change output.
 func (btc *baseWallet) signTxAndAddChange(baseTx *wire.MsgTx, addr btcutil.Address,
-	totalIn, totalOut, feeRate uint64) (*wire.MsgTx, *output, uint64, error) {
+	totalIn, totalOut, feeRate uint64, subtractFrom int32) (*wire.MsgTx, *output, uint64, error) {
 
 	makeErr := func(s string, a ...interface{}) (*wire.MsgTx, *output, uint64, error) {
 		return nil, nil, 0, fmt.Errorf(s, a...)
@@ -3899,39 +3901,60 @@ func (btc *baseWallet) signTxAndAddChange(baseTx *wire.MsgTx, addr btcutil.Addre
 	vSize := dexbtc.MsgTxVBytes(msgTx)
 	minFee := feeRate * vSize
 	remaining := totalIn - totalOut
-	if minFee > remaining {
-		return makeErr("not enough funds to cover minimum fee rate. %.8f < %.8f, raw tx: %x",
-			toBTC(totalIn), toBTC(minFee+totalOut), btc.wireBytes(baseTx))
+	if subtractFrom == -1 && minFee > remaining {
+		return makeErr("not enough funds to cover minimum fee. %.8f > %.8f, raw tx: %x",
+			toBTC(minFee), toBTC(remaining), btc.wireBytes(baseTx))
 	}
 
-	// Create a change output.
-	changeScript, err := txscript.PayToAddrScript(addr)
-	if err != nil {
-		return makeErr("error creating change script: %v", err)
-	}
+	// Add a change output if there is enough remaining.
+	var changeAdded bool
+	var changeOutput *wire.TxOut
+	var changeValue uint64
 	changeFees := dexbtc.P2PKHOutputSize * feeRate
 	if btc.segwit {
 		changeFees = dexbtc.P2WPKHOutputSize * feeRate
 	}
-	changeIdx := len(baseTx.TxOut)
-	changeOutput := wire.NewTxOut(int64(remaining-minFee-changeFees), changeScript)
-	if changeFees+minFee > remaining { // Prevent underflow
-		changeOutput.Value = 0
+	minFeeWithChange := changeFees + minFee
+	if remaining > minFeeWithChange {
+		changeValue = remaining - minFeeWithChange
+		if subtractFrom >= 0 {
+			changeValue = remaining
+		}
+		// Create a change output.
+		changeScript, err := txscript.PayToAddrScript(addr)
+		if err != nil {
+			return makeErr("error creating change script: %v", err)
+		}
+		changeOutput = wire.NewTxOut(int64(changeValue), changeScript)
+		if !btc.IsDust(changeOutput, feeRate) {
+			if subtractFrom >= 0 { // only subtract after dust check
+				baseTx.TxOut[subtractFrom].Value -= int64(minFeeWithChange)
+				remaining += minFeeWithChange
+			}
+			// Add the change output.
+			vSize0 := dexbtc.MsgTxVBytes(baseTx)
+			baseTx.AddTxOut(changeOutput)
+			changeSize := dexbtc.MsgTxVBytes(baseTx) - vSize0 // may be dexbtc.P2WPKHOutputSize
+			btc.log.Debugf("Change output size = %d, addr = %s", changeSize, addr.String())
+			changeAdded = true
+			totalOut += uint64(changeOutput.Value)
+		}
 	}
+
+	lastFee := remaining
+
 	// If the change is not dust, recompute the signed txn size and iterate on
 	// the fees vs. change amount.
-	changeAdded := !btc.IsDust(changeOutput, feeRate)
-	if changeAdded {
-		// Add the change output.
-		vSize0 := dexbtc.MsgTxVBytes(baseTx)
-		baseTx.AddTxOut(changeOutput)
-		changeSize := dexbtc.MsgTxVBytes(baseTx) - vSize0   // may be dexbtc.P2WPKHOutputSize
-		addrStr, _ := btc.stringAddr(addr, btc.chainParams) // just for logging
-		btc.log.Debugf("Change output size = %d, addr = %s", changeSize, addrStr)
+	if changeAdded || subtractFrom >= 0 {
+		subtractee := changeOutput
+		if subtractFrom >= 0 {
+			subtractee = baseTx.TxOut[subtractFrom]
+		}
+		// The amount available for fees is the sum of what is presently
+		// allocated to fees (lastFee) and the value of the subtractee output,
+		// which add to fees or absorb excess fees from lastFee.
+		reservoir := lastFee + uint64(subtractee.Value)
 
-		vSize += changeSize
-		fee := feeRate * vSize
-		changeOutput.Value = int64(remaining - fee)
 		// Find the best fee rate by closing in on it in a loop.
 		tried := map[uint64]bool{}
 		for {
@@ -3943,54 +3966,59 @@ func (btc *baseWallet) signTxAndAddChange(baseTx *wire.MsgTx, addr btcutil.Addre
 			}
 			vSize = dexbtc.MsgTxVBytes(msgTx) // recompute the size with new tx signature
 			reqFee := feeRate * vSize
-			if reqFee > remaining {
+			if reqFee > reservoir {
 				// I can't imagine a scenario where this condition would be true, but
 				// I'd hate to be wrong.
 				btc.log.Errorf("reached the impossible place. in = %.8f, out = %.8f, reqFee = %.8f, lastFee = %.8f, raw tx = %x, vSize = %d, feeRate = %d",
-					toBTC(totalIn), toBTC(totalOut), toBTC(reqFee), toBTC(fee), btc.wireBytes(msgTx), vSize, feeRate)
+					toBTC(totalIn), toBTC(totalOut), toBTC(reqFee), toBTC(lastFee), btc.wireBytes(msgTx), vSize, feeRate)
 				return makeErr("change error")
 			}
-			if fee == reqFee || (fee > reqFee && tried[reqFee]) {
-				// If a lower fee appears available, but it's already been attempted and
-				// had a longer serialized size, the current fee is likely as good as
-				// it gets.
+
+			// If 1) lastFee == reqFee, nothing changed since the last cycle.
+			// And there is likely no room for improvement. If 2) The reqFee
+			// required for a transaction of this size is less than the
+			// currently signed transaction fees, but we've already tried it,
+			// then it must have a larger serialize size, so the current fee is
+			// as good as it gets.
+			if lastFee == reqFee || (lastFee > reqFee && tried[reqFee]) {
 				break
 			}
 
 			// We must have some room for improvement.
-			tried[fee] = true
-			fee = reqFee
-			changeOutput.Value = int64(remaining - fee)
-			if btc.IsDust(changeOutput, feeRate) {
+			tried[lastFee] = true
+			subtractee.Value = int64(reservoir - reqFee)
+			lastFee = reqFee
+			if btc.IsDust(subtractee, feeRate) {
 				// Another condition that should be impossible, but check anyway in case
 				// the maximum fee was underestimated causing the first check to be
 				// missed.
 				btc.log.Errorf("reached the impossible place. in = %.8f, out = %.8f, reqFee = %.8f, lastFee = %.8f, raw tx = %x",
-					toBTC(totalIn), toBTC(totalOut), toBTC(reqFee), toBTC(fee), btc.wireBytes(msgTx))
+					toBTC(totalIn), toBTC(totalOut), toBTC(reqFee), toBTC(lastFee), btc.wireBytes(msgTx))
 				return makeErr("dust error")
 			}
 			continue
 		}
 
-		totalOut += uint64(changeOutput.Value)
-	} else {
-		btc.log.Debugf("Foregoing change worth up to %v in tx %v because it is dust",
-			changeOutput.Value, msgTx.TxHash())
+		totalOut -= lastFee
 	}
 
-	fee := totalIn - totalOut
-	actualFeeRate := fee / vSize
+	// Double check the resulting txns fee.
+	checkFee := totalIn - totalOut
+	if checkFee != lastFee {
+		makeErr("fee mismatch! %.8f != %.8f, raw tx: %x", toBTC(checkFee), toBTC(lastFee), btc.wireBytes(msgTx))
+	}
+	actualFeeRate := lastFee / vSize
 	txHash := msgTx.TxHash()
 	btc.log.Debugf("%d signature cycles to converge on fees for tx %s: "+
 		"min rate = %d, actual fee rate = %d (%v for %v bytes), change = %v",
-		sigCycles, txHash, feeRate, actualFeeRate, fee, vSize, changeAdded)
+		sigCycles, txHash, feeRate, actualFeeRate, lastFee, vSize, changeAdded)
 
 	var change *output
 	if changeAdded {
-		change = newOutput(&txHash, uint32(changeIdx), uint64(changeOutput.Value))
+		change = newOutput(&txHash, uint32(len(msgTx.TxOut)-1), uint64(changeOutput.Value))
 	}
 
-	return msgTx, change, fee, nil
+	return msgTx, change, lastFee, nil
 }
 
 func (btc *baseWallet) broadcastTx(signedTx *wire.MsgTx) error {
@@ -4043,6 +4071,70 @@ func (btc *baseWallet) createWitnessSig(tx *wire.MsgTx, idx int, pkScript []byte
 		return nil, nil, err
 	}
 	return sig, privKey.PubKey().SerializeCompressed(), nil
+}
+
+// EstimateSendFee returns an estimated fee required for either a send or
+// withdraw tx.
+func (btc *baseWallet) EstimateSendFee(address string, amount, feeRate uint64, subtract bool) (fee uint64, err error) {
+	addr, err := btc.decodeAddr(address, btc.chainParams)
+	if err != nil {
+		return 0, fmt.Errorf("address decode error: %w", err)
+	}
+	if amount == 0 {
+		return 0, fmt.Errorf("cannot check fee: amount = 0")
+	}
+
+	// Include change fees when selecting inputs.
+	changeFees := dexbtc.P2PKHOutputSize * feeRate
+	if btc.segwit {
+		changeFees = dexbtc.P2WPKHOutputSize * feeRate
+	}
+	// If subtract is true, select enough inputs for amount. Fees will be taken from the
+	// amount. If not, select enough inputs to cover minimum fees with change
+	// fees.
+	enough := func(inputsSize, sum uint64) bool {
+		if subtract {
+			return sum >= amount
+		}
+		return sum >= amount+changeFees+(inputsSize*feeRate)
+	}
+	utxos, _, _, err := btc.spendableUTXOs(0)
+	if err != nil {
+		return 0, err
+	}
+	_, _, coins, _, _, _, err := fund(utxos, enough)
+	if err != nil {
+		return 0, err
+	}
+
+	var totalOut uint64
+	baseTx, totalIn, _, err := btc.fundedTx(coins)
+	if err != nil {
+		return 0, err
+	}
+	payScript, err := txscript.PayToAddrScript(addr)
+	if err != nil {
+		return 0, fmt.Errorf("unable to generate payscript for address %s: %w", addr, err)
+	}
+	baseTx.AddTxOut(wire.NewTxOut(int64(amount), payScript))
+	totalOut += amount
+
+	// Grab a change address.
+	changeAddr, err := btc.node.changeAddress()
+	if err != nil {
+		return 0, err
+	}
+
+	var feeSource int32 // subtract from vout 0
+	if !subtract {
+		feeSource = -1 // subtract from change
+	}
+
+	_, _, fee, err = btc.signTxAndAddChange(baseTx, changeAddr, totalIn, totalOut, btc.feeRateWithFallback(feeRate), feeSource)
+	if err != nil {
+		return 0, err
+	}
+	return fee, nil
 }
 
 type utxo struct {

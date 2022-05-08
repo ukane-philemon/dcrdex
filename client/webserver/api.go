@@ -882,6 +882,33 @@ func (s *WebServer) apiMaxBuy(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, resp, s.indent)
 }
 
+// apiGetSendFee handles the "/getsendfee" API request.
+func (s *WebServer) apiGetSendFee(w http.ResponseWriter, r *http.Request) {
+	form := new(sendOrWithdrawForm)
+	defer form.Pass.Clear()
+	if !readPost(w, r, form) {
+		return
+	}
+	state := s.core.WalletState(form.AssetID)
+	if state == nil {
+		s.writeAPIError(w, fmt.Errorf("no wallet found for %s", unbip(form.AssetID)))
+		return
+	}
+	fee, err := s.core.EstimateSendFee(form.Pass, form.AssetID, form.Value, form.Address, form.Subtract)
+	if err != nil {
+		s.writeAPIError(w, fmt.Errorf("check fee error: %w", err))
+		return
+	}
+	resp := struct {
+		OK  bool   `json:"ok"`
+		Fee uint64 `json:"fee"`
+	}{
+		OK:  true,
+		Fee: fee,
+	}
+	writeJSON(w, resp, s.indent)
+}
+
 // apiMaxSell handles the 'maxsell' API request.
 func (s *WebServer) apiMaxSell(w http.ResponseWriter, r *http.Request) {
 	form := &struct {

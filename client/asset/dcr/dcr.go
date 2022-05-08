@@ -2851,6 +2851,7 @@ func msgTxToHex(msgTx *wire.MsgTx) (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+// makeChangeOut creates a new tx output using val as output value.
 func (dcr *ExchangeWallet) makeChangeOut(val uint64) (*wire.TxOut, stdaddr.Address, error) {
 	changeAddr, err := dcr.wallet.InternalAddress(dcr.ctx, dcr.acctName)
 	if err != nil {
@@ -2892,7 +2893,7 @@ func (dcr *ExchangeWallet) signTxAndAddChange(baseTx *wire.MsgTx, feeRate uint64
 
 	minFee := feeRate * size
 	if subtractFrom == -1 && minFee > remaining {
-		return nil, nil, "", 0, fmt.Errorf("not enough funds to cover minimum fee rate. %s > %s",
+		return nil, nil, "", 0, fmt.Errorf("not enough funds to cover minimum fee. %s > %s",
 			amount(minFee), amount(remaining))
 	}
 	if int(subtractFrom) >= len(baseTx.TxOut) {
@@ -3021,6 +3022,59 @@ func (dcr *ExchangeWallet) signTxAndAddChange(baseTx *wire.MsgTx, feeRate uint64
 	}
 
 	return msgTx, change, changeAddr, lastFee, nil
+}
+
+// EstimateSendFee returns an estimated fee required for either a send or
+// withdraw tx.
+func (dcr *ExchangeWallet) EstimateSendFee(address string, value, feeRate uint64, subtract bool) (fee uint64, err error) {
+	// Keep a consistent view of spendable and locked coins in the wallet and
+	// the fundingCoins map to make this safe for concurrent use.
+	dcr.fundingMtx.Lock()
+	defer dcr.fundingMtx.Unlock()
+
+	addr, err := stdaddr.DecodeAddress(address, dcr.chainParams)
+	if err != nil {
+		return 0, err
+	}
+	if value == 0 {
+		return 0, fmt.Errorf("cannot check fee: value = 0")
+	}
+
+	// If not send, select enough inputs for amount. Fees will be taken from the
+	// amount. If send, select enough inputs to cover minimum fees.
+	enough := func(sum uint64, size uint32, unspent *compositeUTXO) bool {
+		if subtract {
+			return sum+toAtoms(unspent.rpc.Amount) >= value
+		}
+		return sum+toAtoms(unspent.rpc.Amount) >= value+uint64(size)*feeRate
+	}
+	utxos, err := dcr.spendableUTXOs()
+	if err != nil {
+		return 0, err
+	}
+	_, _, coins, _, _, err := dcr.tryFund(utxos, enough)
+	if err != nil {
+		return 0, err
+	}
+
+	baseTx := wire.NewMsgTx()
+	_, err = dcr.addInputCoins(baseTx, coins)
+	if err != nil {
+		return 0, err
+	}
+	payScriptVer, payScript := addr.PaymentScript()
+	txOut := newTxOut(int64(value), payScriptVer, payScript)
+	baseTx.AddTxOut(txOut)
+
+	var feeSource int32 // subtract from vout 0
+	if !subtract {
+		feeSource = -1 // subtract from change
+	}
+	_, _, _, fee, err = dcr.signTxAndAddChange(baseTx, dcr.feeRateWithFallback(feeRate), feeSource)
+	if err != nil {
+		return 0, err
+	}
+	return fee, nil
 }
 
 func (dcr *ExchangeWallet) broadcastTx(signedTx *wire.MsgTx) error {

@@ -4078,11 +4078,33 @@ func (c *Core) Send(pw []byte, assetID uint32, value uint64, address string, sub
 		return nil, err
 	}
 
-	subject, details := c.formatDetails(TopicSendSucess, unbip(assetID), coin)
+	subject, details := c.formatDetails(TopicSendSucess, coin.Value(), unbip(assetID), coin)
 	c.notify(newSendNote(TopicSendSucess, subject, details, db.Success))
 
 	c.updateAssetBalance(assetID)
 	return coin, nil
+}
+
+// EstimateSendFee returns an estimated fee for either a send or
+// withdraw tx.
+func (c *Core) EstimateSendFee(pw []byte, assetID uint32, value uint64, address string, subtract bool) (fee uint64, err error) {
+	crypter, err := c.encryptionKey(pw)
+	if err != nil {
+		return 0, fmt.Errorf("password error: %w", err)
+	}
+	defer crypter.Close()
+	if value == 0 {
+		return 0, fmt.Errorf("cannot check fee zero %s", unbip(assetID))
+	}
+	wallet, found := c.wallet(assetID)
+	if !found {
+		return 0, newError(missingWalletErr, "no wallet found for %s", unbip(assetID))
+	}
+	err = c.connectAndUnlock(crypter, wallet)
+	if err != nil {
+		return 0, err
+	}
+	return wallet.Wallet.EstimateSendFee(address, value, c.feeSuggestionAny(assetID), subtract)
 }
 
 func (c *Core) PreOrder(form *TradeForm) (*OrderEstimate, error) {
