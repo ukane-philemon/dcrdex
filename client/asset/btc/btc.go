@@ -3357,6 +3357,63 @@ func (btc *baseWallet) createWitnessSig(tx *wire.MsgTx, idx int, pkScript []byte
 	return sig, privKey.PubKey().SerializeCompressed(), nil
 }
 
+// EstimateWithdrawalFee returns an estimated fee required for either a
+// send or withdraw tx.
+func (btc *baseWallet) EstimateWithdrawalFee(address string, amount, feeRate uint64, send bool) (fee uint64, err error) {
+	addr, err := btc.decodeAddr(address, btc.chainParams)
+	if err != nil {
+		return 0, fmt.Errorf("address decode error: %w", err)
+	}
+	if amount == 0 {
+		return 0, fmt.Errorf("cannot check fee: amount = 0")
+	}
+	// If not send, let's not take more than required input.
+	// this might be a sweep tx.
+	rate := feeRate
+	if !send {
+		rate = 0
+	}
+	// If not minusFees, select enough input to cover minimum fees
+	// and the remaining will become change.
+	// If minusFees is true, select enough for only value.
+	// Fees will be taken from val.
+	enough := func(inputsSize, sum uint64) bool {
+		minFee := inputsSize * rate
+		return sum >= amount+minFee
+	}
+	utxos, _, _, err := btc.spendableUTXOs(0)
+	if err != nil {
+		return 0, err
+	}
+	_, _, coins, _, _, _, err := fund(utxos, enough)
+	if err != nil {
+		return 0, err
+	}
+
+	var totalOut uint64
+	baseTx, totalIn, _, err := btc.fundedTx(coins)
+	if err != nil {
+		return 0, err
+	}
+	payScript, err := txscript.PayToAddrScript(addr)
+	if err != nil {
+		return 0, fmt.Errorf("unable to generate payscript for address %s: %w", addr, err)
+	}
+	baseTx.AddTxOut(wire.NewTxOut(int64(amount), payScript))
+	totalOut += amount
+
+	// Grab a change address.
+	changeAddr, err := btc.node.changeAddress()
+	if err != nil {
+		return 0, err
+	}
+	_, _, fee, err = btc.signTxAndAddChange(baseTx, changeAddr, totalIn, totalOut, btc.feeRateWithFallback(feeRate))
+	if err != nil {
+		return 0, err
+	}
+	return fee, nil
+}
+
 type utxo struct {
 	txHash  *chainhash.Hash
 	vout    uint32

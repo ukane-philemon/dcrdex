@@ -319,6 +319,9 @@ type Wallet interface {
 	// EstimateRegistrationTxFee returns an estimate for the tx fee needed to
 	// pay the registration fee using the provided feeRate.
 	EstimateRegistrationTxFee(feeRate uint64) uint64
+	// EstimateWithdrawalFee returns an estimate for the fee needed to either
+	// send or withdraw.
+	EstimateWithdrawalFee(address string, value, feeRate uint64, send bool) (fee uint64, err error)
 }
 
 // Rescanner is a wallet implementation with rescan functionality.

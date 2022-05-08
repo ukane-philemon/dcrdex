@@ -3935,6 +3935,28 @@ func (c *Core) Withdraw(pw []byte, assetID uint32, value uint64, address string)
 	return coin, nil
 }
 
+// EstimatewithdrawalFee returns the estimated fee needed for either a send or
+// withdraw tx.
+func (c *Core) EstimateWithdrawalFee(pw []byte, assetID uint32, value uint64, address string, send bool) (fee uint64, err error) {
+	crypter, err := c.encryptionKey(pw)
+	if err != nil {
+		return 0, fmt.Errorf("password error: %w", err)
+	}
+	defer crypter.Close()
+	if value == 0 {
+		return 0, fmt.Errorf("cannot check fee zero %s", unbip(assetID))
+	}
+	wallet, found := c.wallet(assetID)
+	if !found {
+		return 0, newError(missingWalletErr, "no wallet found for %s", unbip(assetID))
+	}
+	err = c.connectAndUnlock(crypter, wallet)
+	if err != nil {
+		return 0, err
+	}
+	return wallet.Wallet.EstimateWithdrawalFee(address, value, c.feeSuggestionAny(assetID), send)
+}
+
 func (c *Core) PreOrder(form *TradeForm) (*OrderEstimate, error) {
 	dc, err := c.connectedDEX(form.Host)
 	if err != nil {

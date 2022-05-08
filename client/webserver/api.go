@@ -706,7 +706,7 @@ func (s *WebServer) apiReconfig(w http.ResponseWriter, r *http.Request) {
 
 // apiWithdraw handles the 'withdraw' API request.
 func (s *WebServer) apiWithdraw(w http.ResponseWriter, r *http.Request) {
-	form := new(withdrawForm)
+	form := new(sendOrWithdrawForm)
 	defer form.Pass.Clear()
 	if !readPost(w, r, form) {
 		return
@@ -753,6 +753,33 @@ func (s *WebServer) apiMaxBuy(w http.ResponseWriter, r *http.Request) {
 	}{
 		OK:     true,
 		MaxBuy: maxBuy,
+	}
+	writeJSON(w, resp, s.indent)
+}
+
+// apiGetWithdrawFee handles the "/getwithdrawfee" API request.
+func (s *WebServer) apiGetWithdrawFee(w http.ResponseWriter, r *http.Request) {
+	form := new(sendOrWithdrawForm)
+	defer form.Pass.Clear()
+	if !readPost(w, r, form) {
+		return
+	}
+	state := s.core.WalletState(form.AssetID)
+	if state == nil {
+		s.writeAPIError(w, fmt.Errorf("no wallet found for %s", unbip(form.AssetID)))
+		return
+	}
+	fee, err := s.core.EstimateWithdrawalFee(form.Pass, form.AssetID, form.Value, form.Address, form.Send)
+	if err != nil {
+		s.writeAPIError(w, fmt.Errorf("check fee error: %w", err))
+		return
+	}
+	resp := struct {
+		OK    bool   `json:"ok"`
+		Fee   uint64 `json:"fee"`
+	}{
+		OK:    true,
+		Fee:   fee,
 	}
 	writeJSON(w, resp, s.indent)
 }

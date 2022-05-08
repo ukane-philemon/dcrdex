@@ -30,7 +30,6 @@ import (
 	"decred.org/dcrdex/dex/encrypt"
 	"decred.org/dcrdex/dex/msgjson"
 	"decred.org/dcrdex/dex/order"
-	"decred.org/dcrdex/dex/order/test"
 	ordertest "decred.org/dcrdex/dex/order/test"
 	"decred.org/dcrdex/dex/wait"
 	"decred.org/dcrdex/server/account"
@@ -827,6 +826,10 @@ func (w *TXCWallet) EstimateRegistrationTxFee(feeRate uint64) uint64 {
 	return 0
 }
 
+func (w *TXCWallet) EstimateWithdrawalFee(address string, value, feeRate uint64, send bool) (fee uint64, err error) {
+	return 0, nil
+
+}
 func (w *TXCWallet) ValidateSecret(secret, secretHash []byte) bool {
 	return !w.badSecret
 }
@@ -4734,7 +4737,7 @@ func TestReconcileTrades(t *testing.T) {
 			clientOrders: []*trackedTrade{},
 			serverOrders: []*msgjson.OrderStatus{
 				{
-					ID:     test.RandomOrderID().Bytes(),
+					ID:     ordertest.RandomOrderID().Bytes(),
 					Status: uint16(order.OrderStatusBooked),
 				},
 			},

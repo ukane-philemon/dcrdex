@@ -1413,6 +1413,11 @@ func (c *TCore) Withdraw(pw []byte, assetID uint32, value uint64, address string
 	return &tCoin{id: []byte{0xde, 0xc7, 0xed}}, nil
 }
 
+func (w *TCore) EstimateWithdrawalFee(pw []byte, assetID uint32, value uint64, address string, send bool) (val, fee uint64, err error) {
+	return 0, 0, nil
+
+}
+
 func (c *TCore) Trade(pw []byte, form *core.TradeForm) (*core.Order, error) {
 	c.OpenWallet(form.Quote, []byte(""))
 	c.OpenWallet(form.Base, []byte(""))

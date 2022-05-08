@@ -116,7 +116,11 @@ export default class WalletsPage extends BasePage {
     this.unlockForm = new UnlockWalletForm(page.unlockWalletForm, () => { this.openWalletSuccess() })
 
     // Bind the withdraw form.
-    bindForm(page.withdrawForm, page.submitWithdraw, () => { this.withdraw() })
+    bindForm(page.withdrawForm, page.submitWithdraw, async () => { this.stepSubmit() })
+    // Withdraw verification form.
+    bindForm(page.vWithdrawForm, page.vWithdraw, async () => { this.withdraw() })
+    // Cancel withdraw verification form.
+    bindForm(page.vWithdrawForm, page.vCancelWithdraw, () => { this.withdrawCancel() })
 
     // Bind the wallet reconfiguration submission.
     bindForm(page.reconfigForm, page.submitReconfig, () => this.reconfig())
@@ -197,6 +201,60 @@ export default class WalletsPage extends BasePage {
       walletstate: (note: WalletStateNote) => { this.handleWalletStateNote(note) },
       walletconfig: (note: WalletStateNote) => { this.handleWalletStateNote(note) }
     }
+  }
+
+  // stepSubmit makes a request to get an estimate fee and an estimate
+  // amount to destination and displays the verify withdraw form.
+  async stepSubmit () {
+    const page = this.page
+    Doc.hide(page.withdrawErr)
+    page.vWithdrawFee.textContent = '0.00000000'
+    page.vWithdrawDestinationAmt.textContent = '0.00000000'
+    page.vTotalWithdraw.textContent = '0.00000000'
+    page.vWithdrawErr.textContent = ''
+    const assetID = parseInt(page.withdrawForm.dataset.assetID || '')
+    const send = page.sendCheckBox.checked || false
+    const conversionFactor = app().unitInfo(assetID).conventional.conversionFactor
+    const value = Math.round(parseFloat(page.withdrawAmt.value || '') * conversionFactor)
+    const open = {
+      assetID: assetID,
+      address: page.withdrawAddr.value,
+      send: send,
+      value: value,
+      pw: page.withdrawPW.value
+    }
+    const loaded = app().loading(page.withdrawForm)
+    const res = await postJSON('/api/getwithdrawfee', open)
+    if (!app().checkResponse(res, true)) {
+      page.withdrawErr.textContent = res.msg
+      Doc.show(page.withdrawErr)
+      loaded()
+      return
+    } else if (res.fee === 0) {
+      page.vWithdrawErr.textContent = 'Fee estimation currently unavailable.'
+      await this.hideBox()
+      loaded()
+      this.animation = this.showBox(page.vWithdrawForm)
+      return
+    }
+
+    await this.hideBox()
+    loaded()
+    page.vWithdrawFee.textContent = Doc.formatFullPrecision(res.fee, app().unitInfo(assetID))
+    page.vWithdrawDestinationAmt.textContent = Doc.formatFullPrecision(value - res.fee, app().unitInfo(assetID))
+    page.vTotalWithdraw.textContent = Doc.formatFullPrecision(value, app().unitInfo(assetID))
+    if (send) {
+      page.vWithdrawDestinationAmt.textContent = Doc.formatFullPrecision(value, app().unitInfo(assetID))
+      page.vTotalWithdraw.textContent = Doc.formatFullPrecision(value + res.fee, app().unitInfo(assetID))
+    }
+    this.animation = this.showBox(page.vWithdrawForm)
+  }
+
+  // withdrawCancel displays the withdraw form if user wants to make modification
+  // to withdrawal.
+  async withdrawCancel () {
+    await this.hideBox()
+    this.animation = this.showBox(this.page.withdrawForm)
   }
 
   /*
@@ -500,7 +558,7 @@ export default class WalletsPage extends BasePage {
   /* withdraw submits the withdrawal form to the API. */
   async withdraw () {
     const page = this.page
-    Doc.hide(page.withdrawErr)
+    Doc.hide(page.vWithdrawErr)
     const assetID = parseInt(page.withdrawForm.dataset.assetID || '')
     const conversionFactor = app().unitInfo(assetID).conventional.conversionFactor
     const open = {
@@ -509,12 +567,12 @@ export default class WalletsPage extends BasePage {
       value: Math.round(parseFloat(page.withdrawAmt.value || '') * conversionFactor),
       pw: page.withdrawPW.value
     }
-    const loaded = app().loading(page.withdrawForm)
+    const loaded = app().loading(page.vWithdrawForm)
     const res = await postJSON('/api/withdraw', open)
     loaded()
     if (!app().checkResponse(res, true)) {
-      page.withdrawErr.textContent = res.msg
-      Doc.show(page.withdrawErr)
+      page.vWithdrawErr.textContent = res.msg
+      Doc.show(page.vWithdrawErr)
       return
     }
     this.showMarkets(assetID)

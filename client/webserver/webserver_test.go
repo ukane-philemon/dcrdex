@@ -129,6 +129,9 @@ func (c *TCore) SupportedAssets() map[uint32]*core.SupportedAsset {
 func (c *TCore) Withdraw(pw []byte, assetID uint32, value uint64, address string) (asset.Coin, error) {
 	return &tCoin{id: []byte{0xde, 0xc7, 0xed}}, c.withdrawErr
 }
+func (c *TCore) EstimateWithdrawalFee(pw []byte, assetID uint32, value uint64, address string, send bool) (fee uint64, err error) {
+	return 0, nil
+}
 func (c *TCore) Trade(pw []byte, form *core.TradeForm) (*core.Order, error) {
 	oType := order.LimitOrderType
 	if !form.IsLimit {
@@ -428,7 +431,7 @@ func TestAPIWithdraw(t *testing.T) {
 		return resp.OK
 	}
 
-	body = &withdrawForm{
+	body = &sendOrWithdrawForm{
 		Pass: encode.PassBytes("dummyAppPass"),
 	}
 
