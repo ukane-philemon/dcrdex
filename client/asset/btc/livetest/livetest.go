@@ -529,10 +529,12 @@ func Run(t *testing.T, cfg *Config) {
 		if err != nil {
 			t.Fatalf("error withdrawing: %v", err)
 		}
-		if coin.Value() == cfg.LotSize || coin.Value() > cfg.LotSize {
-			t.Fatalf("Expected %d got %d", cfg.LotSize, coin.Value())
+		if coin.Value() >= cfg.LotSize {
+			t.Fatalf("Expected less than %d got %d", cfg.LotSize, coin.Value())
 		}
 		tLogger.Infof("Withdrew with %s", coin.String())
+	} else {
+		t.Fatal("Expected to support withdrawing")
 	}
 
 	// Test Send.
@@ -546,7 +548,10 @@ func Run(t *testing.T, cfg *Config) {
 			t.Fatalf("Expected %d got %d", cfg.LotSize, coin.Value())
 		}
 		tLogger.Infof("Sent with %s", coin.String())
+	} else {
+		t.Fatal("Expected to isupport sending.")
 	}
+
 	if cfg.SPV {
 		mine()
 	}

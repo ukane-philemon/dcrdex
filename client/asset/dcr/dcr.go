@@ -2527,9 +2527,9 @@ func (dcr *ExchangeWallet) PayFee(address string, regFee, feeRate uint64) (asset
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Evaluate SendToAddress and how it deals with the change output
+	// TODO: Evaluate SendToAddress rpc and how it deals with the change output
 	// address index to see if it can be used here instead.
-	msgTx, sent, err := dcr.sendRegFee(addr, regFee, dcr.feeRateWithFallback(feeRate))
+	msgTx, sent, err := dcr.sendToAddress(addr, regFee, dcr.feeRateWithFallback(feeRate))
 	if err != nil {
 		return nil, err
 	}
@@ -2558,16 +2558,16 @@ func (dcr *ExchangeWallet) Withdraw(address string, value, feeRate uint64) (asse
 	if err != nil {
 		return nil, err
 	}
-	msgTx, sentVal, err := dcr.sendMinusFees(addr, value, dcr.feeRateWithFallback(feeRate))
+	msgTx, sentVal, err := dcr.withdraw(addr, value, dcr.feeRateWithFallback(feeRate))
 	if err != nil {
 		return nil, err
 	}
 	return newOutput(msgTx.CachedTxHash(), 0, sentVal, wire.TxTreeRegular), nil
 }
 
-// Send sends the exact value to the specified address.
-// This is different from Withdraw, which subtracts the
-// tx fees from the amount sent. feeRate is in units of atoms/byte.
+// Send sends the exact value to the specified address. This is different from
+// Withdraw, which subtracts the tx fees from the amount sent. feeRate is in
+// units of atoms/byte.
 // Send satisfies asset.Sender.
 func (dcr *ExchangeWallet) Send(address string, value, feeRate uint64) (asset.Coin, error) {
 	addr, err := stdaddr.DecodeAddress(address, dcr.chainParams)
@@ -2776,9 +2776,9 @@ func (dcr *ExchangeWallet) convertCoin(coin asset.Coin) (*output, error) {
 	return newOutput(txHash, vout, coin.Value(), wire.TxTreeUnknown), nil
 }
 
-// sendMinusFees sends the amount to the address. Fees are subtracted from the
+// withdraw sends the amount to the address. Fees are subtracted from the
 // sent value.
-func (dcr *ExchangeWallet) sendMinusFees(addr stdaddr.Address, val, feeRate uint64) (*wire.MsgTx, uint64, error) {
+func (dcr *ExchangeWallet) withdraw(addr stdaddr.Address, val, feeRate uint64) (*wire.MsgTx, uint64, error) {
 	if val == 0 {
 		return nil, 0, fmt.Errorf("cannot withdraw value = 0")
 	}
@@ -2807,13 +2807,6 @@ func (dcr *ExchangeWallet) sendToAddress(addr stdaddr.Address, amt, feeRate uint
 			amount(amt), feeRate, err)
 	}
 	return dcr.sendCoins(addr, coins, amt, feeRate, false)
-}
-
-// sendRegFee sends the registration fee to the address. Transaction fees will
-// be in addition to the registration fee and the output will be the zeroth
-// output.
-func (dcr *ExchangeWallet) sendRegFee(addr stdaddr.Address, regFee, netFeeRate uint64) (*wire.MsgTx, uint64, error) {
-	return dcr.sendToAddress(addr, regFee, netFeeRate)
 }
 
 // sendCoins sends the amount to the address as the zeroth output, spending the

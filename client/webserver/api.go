@@ -829,7 +829,7 @@ func (s *WebServer) apiReconfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, simpleAck(), s.indent)
 }
 
-// apiSendOrWithdraw handles both 'withdraw or send' API request.
+// apiSendOrWithdraw handles the 'withdraw' API request.
 func (s *WebServer) apiSendOrWithdraw(w http.ResponseWriter, r *http.Request) {
 	form := new(sendOrWithdrawForm)
 	defer form.Pass.Clear()

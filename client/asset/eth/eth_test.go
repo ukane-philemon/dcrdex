@@ -3200,9 +3200,6 @@ func testSend(t *testing.T, assetID uint32) {
 	if !isSender {
 		t.Fatal("wallet is expected to support sending")
 	}
-	if _, isWithdrawer := w.(asset.Withdrawer); isWithdrawer {
-		t.Fatal("wallet is not expected to support withdrawal")
-	}
 
 	tx := tTx(0, 0, 0, &testAddressA, nil)
 	txHash := tx.Hash()

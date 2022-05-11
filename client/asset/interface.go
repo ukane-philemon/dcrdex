@@ -11,7 +11,7 @@ import (
 )
 
 // WalletTrait is a bitset indicating various optional wallet features, such as
-// the presence of auxiliary methods like Rescan, Send and Withdraw.
+// the presence of auxiliary methods like Rescan, Send, Withdraw and Sweep.
 type WalletTrait uint64
 
 const (
@@ -356,13 +356,13 @@ type Recoverer interface {
 // Sender is a wallet that can send funds to an address, as opposed to
 // withdrawing a certain amount from the source wallet/account.
 type Sender interface {
-	// Send sends funds to the specified address. Fees are not
-	// subtracted from the value.
+	// Send sends the exact value to the specified address. This is different
+	// from Withdraw, which subtracts the tx fees from the amount sent.
 	Send(address string, value, feeSuggestion uint64) (Coin, error)
 }
 
 // Withdrawer is a wallet that can withdraw a certain amount from the
-// source wallet/account
+// source wallet/account.
 type Withdrawer interface {
 	// Withdraw withdraws funds to the specified address. Fees are subtracted
 	// from the value.
