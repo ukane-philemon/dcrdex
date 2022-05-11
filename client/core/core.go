@@ -4033,13 +4033,12 @@ func (c *Core) feeSuggestion(dc *dexConnection, assetID uint32) (feeSuggestion u
 	return dc.fetchFeeRate(assetID)
 }
 
-// SendOrWithdraw initiates a either a send or withdraw from an
-// exchange wallet. The client password must be provided as an additional
-// verification.
+// SendOrWithdraw initiates either a send or withdraw from an exchange wallet.
+// The client password must be provided as an additional verification.
 func (c *Core) SendOrWithdraw(pw []byte, assetID uint32, value uint64, address string, send bool) (asset.Coin, error) {
 	crypter, err := c.encryptionKey(pw)
 	if err != nil {
-		return nil, fmt.Errorf("Withdraw/send password error: %w", err)
+		return nil, fmt.Errorf("password error: %w", err)
 	}
 	defer crypter.Close()
 	if value == 0 {
@@ -4061,7 +4060,7 @@ func (c *Core) SendOrWithdraw(pw []byte, assetID uint32, value uint64, address s
 		} else {
 			return nil, fmt.Errorf("wallet does not support sending")
 		}
-	} else if !send {
+	} else {
 		if withdrawer, isWithdrawer := wallet.Wallet.(asset.Withdrawer); isWithdrawer {
 			coin, err = withdrawer.Withdraw(address, value, feeSuggestion)
 		} else {

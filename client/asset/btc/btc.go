@@ -3540,9 +3540,9 @@ func (btc *baseWallet) Withdraw(address string, value, feeRate uint64) (asset.Co
 	return newOutput(txHash, vout, sent), nil
 }
 
-// Send sends the exact value to the specified address.
-// This is different from Withdraw, which subtracts the
-// tx fees from the amount sent. feeRate is in units of sats/byte.
+// Send sends the exact value to the specified address. This is different from
+// Withdraw, which subtracts the tx fees from the amount sent. feeRate is in
+// units of sats/byte.
 // Send satisfies asset.Sender.
 func (btc *baseWallet) Send(address string, value, feeRate uint64) (asset.Coin, error) {
 	txHash, vout, sent, err := btc.send(address, value, btc.feeRateWithFallback(feeRate), false)

@@ -2136,8 +2136,6 @@ func (w *assetWallet) SwapConfirmations(ctx context.Context, _ dex.Bytes, contra
 }
 
 // Send sends the exact value to the specified address.
-// This is different from Withdraw, which subtracts the
-// tx fees from the amount sent.
 // Satisfies asset.Sender.
 func (w *ETHWallet) Send(addr string, value, _ uint64) (asset.Coin, error) {
 	bal, err := w.Balance()
@@ -2170,9 +2168,8 @@ func (w *ETHWallet) Send(addr string, value, _ uint64) (asset.Coin, error) {
 	return &coin{id: txHash, value: value}, nil
 }
 
-// Send sends the exact value to the specified address.
-// This is different from Withdraw, which subtracts the
-// tx fees from the amount sent.
+// Send sends the exact value to the specified address. The fees are taken
+// from the parent wallet.
 // Satisfies asset.Sender.
 func (w *TokenWallet) Send(addr string, value, _ uint64) (asset.Coin, error) {
 	bal, err := w.Balance()
@@ -2181,7 +2178,7 @@ func (w *TokenWallet) Send(addr string, value, _ uint64) (asset.Coin, error) {
 	}
 	avail := bal.Available
 	if avail < value {
-		return nil, fmt.Errorf("not enough funds to tokens: have %d gwei need %d gwei", avail, value)
+		return nil, fmt.Errorf("not enough tokens: have %d gwei need %d gwei", avail, value)
 	}
 
 	ethBal, err := w.parent.Balance()

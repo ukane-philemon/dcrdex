@@ -2021,7 +2021,6 @@ func testSender(t *testing.T, senderType tSenderType) {
 	if senderType == tSendSender {
 		const feeSuggestion = 100
 		funName = "Send"
-		// For Send.
 		sender = func(addr string, val uint64) (asset.Coin, error) {
 			return wallet.Send(addr, val, feeSuggestion)
 		}
@@ -2080,7 +2079,7 @@ func TestSend(t *testing.T) {
 	testSender(t, tSendSender)
 }
 
-func Test_sendMinusFees(t *testing.T) {
+func Test_withdraw(t *testing.T) {
 	wallet, node, shutdown, err := tNewWallet()
 	defer shutdown()
 	if err != nil {
@@ -2105,9 +2104,8 @@ func Test_sendMinusFees(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Testing send with minusFees true.
 	// This should make a msgTx with one input and one output.
-	msgTx, val, err := wallet.sendMinusFees(addr, unspentVal, optimalFeeRate)
+	msgTx, val, err := wallet.withdraw(addr, unspentVal, optimalFeeRate)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2126,7 +2124,7 @@ func Test_sendMinusFees(t *testing.T) {
 	// SMALLER than requested because it was required for fees.
 	avail := unspentVal + 77
 	node.unspent[0].Amount = float64(avail) / 1e8
-	msgTx, val, err = wallet.sendMinusFees(addr, unspentVal, optimalFeeRate)
+	msgTx, val, err = wallet.withdraw(addr, unspentVal, optimalFeeRate)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2144,7 +2142,7 @@ func Test_sendMinusFees(t *testing.T) {
 	// because change would be dust, and we don't over pay fees.
 	avail = unspentVal + 3000
 	node.unspent[0].Amount = float64(avail) / 1e8
-	msgTx, val, err = wallet.sendMinusFees(addr, unspentVal, optimalFeeRate)
+	msgTx, val, err = wallet.withdraw(addr, unspentVal, optimalFeeRate)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2160,7 +2158,7 @@ func Test_sendMinusFees(t *testing.T) {
 	// should be exactly unspentVal and the sent amount should be
 	// unspentVal-fees.
 	node.unspent[0].Amount = float64(unspentVal*2) / 1e8
-	msgTx, val, err = wallet.sendMinusFees(addr, unspentVal, optimalFeeRate)
+	msgTx, val, err = wallet.withdraw(addr, unspentVal, optimalFeeRate)
 	if err != nil {
 		t.Fatal(err)
 	}
