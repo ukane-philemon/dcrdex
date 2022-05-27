@@ -125,8 +125,8 @@ func (c *TCore) Wallets() []*core.WalletState {
 func (c *TCore) WalletState(assetID uint32) *core.WalletState {
 	return c.walletState
 }
-func (c *TCore) SendOrWithdraw(pw []byte, assetID uint32, value uint64, addr string, send bool) (asset.Coin, error) {
-	if send {
+func (c *TCore) Send(pw []byte, assetID uint32, value uint64, addr string, subtract bool) (asset.Coin, error) {
+	if !subtract {
 		return c.coin, c.sendErr
 	}
 	return c.coin, c.withdrawErr

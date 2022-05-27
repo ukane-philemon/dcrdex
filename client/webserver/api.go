@@ -829,8 +829,8 @@ func (s *WebServer) apiReconfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, simpleAck(), s.indent)
 }
 
-// apiSendOrWithdraw handles the 'withdraw' API request.
-func (s *WebServer) apiSendOrWithdraw(w http.ResponseWriter, r *http.Request) {
+// apiSend handles the 'send' API request.
+func (s *WebServer) apiSend(w http.ResponseWriter, r *http.Request) {
 	form := new(sendOrWithdrawForm)
 	defer form.Pass.Clear()
 	if !readPost(w, r, form) {
@@ -841,9 +841,9 @@ func (s *WebServer) apiSendOrWithdraw(w http.ResponseWriter, r *http.Request) {
 		s.writeAPIError(w, fmt.Errorf("no wallet found for %s", unbip(form.AssetID)))
 		return
 	}
-	coin, err := s.core.SendOrWithdraw(form.Pass, form.AssetID, form.Value, form.Address, form.Send)
+	coin, err := s.core.Send(form.Pass, form.AssetID, form.Value, form.Address, form.Subtract)
 	if err != nil {
-		s.writeAPIError(w, fmt.Errorf("withdraw/send error: %w", err))
+		s.writeAPIError(w, fmt.Errorf("send/withdraw error: %w", err))
 		return
 	}
 	resp := struct {

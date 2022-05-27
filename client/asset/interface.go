@@ -11,7 +11,7 @@ import (
 )
 
 // WalletTrait is a bitset indicating various optional wallet features, such as
-// the presence of auxiliary methods like Rescan, Send, Withdraw and Sweep.
+// the presence of auxiliary methods like Rescan, Withdraw and Sweep.
 type WalletTrait uint64
 
 const (
@@ -21,6 +21,8 @@ const (
 	WalletTraitFeeRater                             // Wallet can provide a fee rate for non-critical transactions
 	WalletTraitAccelerator                          // This wallet can accelerate transactions using the CPFP technique
 	WalletTraitRecoverer                            // The wallet is an asset.Recoverer.
+	WalletTraitWithdrawer                           // The Wallet can withdraw a specific amount from an exchange wallet.
+	WalletTraitSweeper                              // The Wallet can sweep all the funds, leaving no change.
 )
 
 // IsRescanner tests if the WalletTrait has the WalletTraitRescanner bit set.
@@ -59,6 +61,18 @@ func (wt WalletTrait) IsRecoverer() bool {
 	return wt&WalletTraitRecoverer != 0
 }
 
+// IsWithdrawer tests if the WalletTrait has the WalletTraitSender bit set,
+// which indicates the presence of a Withdraw method.
+func (wt WalletTrait) IsWithdrawer() bool {
+	return wt&WalletTraitWithdrawer != 0
+}
+
+// IsSweeper test if the WalletTrait has the WalletTraitSweeper bit set, which
+// indicates the presence of a Sweep method.
+func (wt WalletTrait) IsSweeper() bool {
+	return wt&WalletTraitSweeper != 0
+}
+
 // DetermineWalletTraits returns the WalletTrait bitset for the provided Wallet.
 func DetermineWalletTraits(w Wallet) (t WalletTrait) {
 	if _, is := w.(Rescanner); is {
@@ -78,6 +92,11 @@ func DetermineWalletTraits(w Wallet) (t WalletTrait) {
 	}
 	if _, is := w.(Recoverer); is {
 		t |= WalletTraitRecoverer
+	if _, is := w.(Withdrawer); is {
+		t |= WalletTraitWithdrawer
+	}
+	if _, is := w.(Sweeper); is {
+		t |= WalletTraitSweeper
 	}
 	return t
 }
@@ -333,6 +352,9 @@ type Wallet interface {
 	// payment. This method need not be supported by all assets. Those assets
 	// which do no support DEX registration fees will return an ErrUnsupported.
 	RegFeeConfirmations(ctx context.Context, coinID dex.Bytes) (confs uint32, err error)
+	// Send sends the exact value to the specified address. This is different
+	// from Withdraw, which subtracts the tx fees from the amount sent.
+	Send(address string, value, feeSuggestion uint64) (Coin, error)
 	// EstimateRegistrationTxFee returns an estimate for the tx fee needed to
 	// pay the registration fee using the provided feeRate.
 	EstimateRegistrationTxFee(feeRate uint64) uint64
@@ -351,14 +373,6 @@ type Recoverer interface {
 	// Move will move all wallet files to a backup directory so the wallet can
 	// be recreated.
 	Move(backupdir string) error
-}
-
-// Sender is a wallet that can send funds to an address, as opposed to
-// withdrawing a certain amount from the source wallet/account.
-type Sender interface {
-	// Send sends the exact value to the specified address. This is different
-	// from Withdraw, which subtracts the tx fees from the amount sent.
-	Send(address string, value, feeSuggestion uint64) (Coin, error)
 }
 
 // Withdrawer is a wallet that can withdraw a certain amount from the

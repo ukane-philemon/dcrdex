@@ -425,7 +425,7 @@ func handleWithdraw(s *RPCServer, params *RawParams) *msgjson.ResponsePayload {
 		return usage(withdrawRoute, err)
 	}
 	defer form.appPass.Clear()
-	coin, err := s.core.SendOrWithdraw(form.appPass, form.assetID, form.value, form.address, false)
+	coin, err := s.core.Send(form.appPass, form.assetID, form.value, form.address, true)
 	if err != nil {
 		errMsg := fmt.Sprintf("unable to withdraw: %v", err)
 		resErr := msgjson.NewError(msgjson.RPCWithdrawError, errMsg)
@@ -443,7 +443,7 @@ func handleSend(s *RPCServer, params *RawParams) *msgjson.ResponsePayload {
 		return usage(sendRoute, err)
 	}
 	defer form.appPass.Clear()
-	coin, err := s.core.SendOrWithdraw(form.appPass, form.assetID, form.value, form.address, true)
+	coin, err := s.core.Send(form.appPass, form.assetID, form.value, form.address, false)
 	if err != nil {
 		errMsg := fmt.Sprintf("unable to send: %v", err)
 		resErr := msgjson.NewError(msgjson.RPCSendError, errMsg)
@@ -1029,14 +1029,14 @@ needed to complete a swap.`,
 	sendRoute: {
 		pwArgsShort: `"appPass"`,
 		argsShort:   `assetID value "address"`,
-		cmdSummary:  `Send value from an exchange wallet to address. Fees are added to the amount.`,
+		cmdSummary:  `Sends exact value from an exchange wallet to address.`,
 		pwArgsLong: `Password Args:
     appPass (string): The DEX client password.`,
 		argsLong: `Args:
     assetID (int): The asset's BIP-44 registered coin index. Used to identify
       which wallet to withdraw from. e.g. 42 for DCR. See
       https://github.com/satoshilabs/slips/blob/master/slip-0044.md
-    value (int): The amount to withdraw in units of the asset's smallest
+    value (int): The amount to send in units of the asset's smallest
       denomination (e.g. satoshis, atoms, etc.)"
     address (string): The address to which funds are sent.`,
 		returns: `Returns:

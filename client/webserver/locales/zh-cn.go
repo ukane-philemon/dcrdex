@@ -148,7 +148,6 @@ var ZhCN = map[string]string{
 	"New Deposit Address":       "新存款地址",
 	"Address":                   "地址",
 	"Amount":                    "金额",
-	"Authorize the withdraw with your app password.": "使用您的应用密码授权取款。",
 	"Reconfigure":            "重新配置",
 	"pw_change_instructions": "更改下面的密码不会更改您钱包中的密码。在您直接通过电子钱包应用程序更改电子钱包密码后，使用此表单更新DEX客户端。",
 	"New Wallet Password":    "新钱包密码",

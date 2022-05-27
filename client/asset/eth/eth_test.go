@@ -3196,11 +3196,6 @@ func testSend(t *testing.T, assetID uint32) {
 	w, eth, node, shutdown := tassetWallet(assetID)
 	defer shutdown()
 
-	sender, isSender := w.(asset.Sender)
-	if !isSender {
-		t.Fatal("wallet is expected to support sending")
-	}
-
 	tx := tTx(0, 0, 0, &testAddressA, nil)
 	txHash := tx.Hash()
 
@@ -3249,7 +3244,7 @@ func testSend(t *testing.T, assetID uint32) {
 			node.tokenContractor.bal = dexeth.GweiToWei(val - test.sendAdj)
 			node.bal = dexeth.GweiToWei(tokenFees - test.feeAdj)
 		}
-		coin, err := sender.Send("", val, 0)
+		coin, err := w.Send("", val, 0)
 		if test.wantErr {
 			if err == nil {
 				t.Fatalf("expected error for test %v", test.name)
