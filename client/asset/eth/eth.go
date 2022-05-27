@@ -234,9 +234,7 @@ type ethFetcher interface {
 
 // Check that assetWallet satisfies the asset.Wallet interface.
 var _ asset.Wallet = (*ETHWallet)(nil)
-var _ asset.Sender = (*ETHWallet)(nil)
 var _ asset.Wallet = (*TokenWallet)(nil)
-var _ asset.Sender = (*TokenWallet)(nil)
 var _ asset.AccountLocker = (*ETHWallet)(nil)
 var _ asset.AccountLocker = (*TokenWallet)(nil)
 var _ asset.TokenMaster = (*ETHWallet)(nil)
@@ -2136,7 +2134,6 @@ func (w *assetWallet) SwapConfirmations(ctx context.Context, _ dex.Bytes, contra
 }
 
 // Send sends the exact value to the specified address.
-// Satisfies asset.Sender.
 func (w *ETHWallet) Send(addr string, value, _ uint64) (asset.Coin, error) {
 	bal, err := w.Balance()
 	if err != nil {
@@ -2170,7 +2167,6 @@ func (w *ETHWallet) Send(addr string, value, _ uint64) (asset.Coin, error) {
 
 // Send sends the exact value to the specified address. The fees are taken
 // from the parent wallet.
-// Satisfies asset.Sender.
 func (w *TokenWallet) Send(addr string, value, _ uint64) (asset.Coin, error) {
 	bal, err := w.Balance()
 	if err != nil {

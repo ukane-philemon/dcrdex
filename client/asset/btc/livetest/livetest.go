@@ -556,19 +556,15 @@ func Run(t *testing.T, cfg *Config) {
 	}
 
 	// Test Send.
-	if sender, isSender := rig.secondWallet.Wallet.(asset.Sender); isSender {
-		tLogger.Info("Testing Send")
-		coin, err = sender.Send(address, cfg.LotSize, 100)
-		if err != nil {
-			t.Fatalf("error sending: %v", err)
-		}
-		if coin.Value() != cfg.LotSize {
-			t.Fatalf("Expected %d got %d", cfg.LotSize, coin.Value())
-		}
-		tLogger.Infof("Sent with %s", coin.String())
-	} else {
-		t.Fatal("Expected to isupport sending.")
+	tLogger.Info("Testing Send")
+	coin, err = rig.secondWallet.Send(address, cfg.LotSize, 100)
+	if err != nil {
+		t.Fatalf("error sending: %v", err)
 	}
+	if coin.Value() != cfg.LotSize {
+		t.Fatalf("Expected %d got %d", cfg.LotSize, coin.Value())
+	}
+	tLogger.Infof("Sent with %s", coin.String())
 
 	if cfg.SPV {
 		mine()

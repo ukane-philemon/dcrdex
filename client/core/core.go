@@ -4033,16 +4033,18 @@ func (c *Core) feeSuggestion(dc *dexConnection, assetID uint32) (feeSuggestion u
 	return dc.fetchFeeRate(assetID)
 }
 
-// SendOrWithdraw initiates either a send or withdraw from an exchange wallet.
-// The client password must be provided as an additional verification.
-func (c *Core) SendOrWithdraw(pw []byte, assetID uint32, value uint64, address string, send bool) (asset.Coin, error) {
+// Send initiates either a send or withdraw from an exchange wallet. if subtract
+// is true, fees are subtracted from the value else fees are taken from the
+// exchange wallet. The client password must be provided as an additional
+// verification.
+func (c *Core) Send(pw []byte, assetID uint32, value uint64, address string, subtract bool) (asset.Coin, error) {
 	crypter, err := c.encryptionKey(pw)
 	if err != nil {
 		return nil, fmt.Errorf("password error: %w", err)
 	}
 	defer crypter.Close()
 	if value == 0 {
-		return nil, fmt.Errorf("cannot withdraw/send zero %s", unbip(assetID))
+		return nil, fmt.Errorf("cannot send/withdraw zero %s", unbip(assetID))
 	}
 	wallet, found := c.wallet(assetID)
 	if !found {
@@ -4054,28 +4056,24 @@ func (c *Core) SendOrWithdraw(pw []byte, assetID uint32, value uint64, address s
 	}
 	var coin asset.Coin
 	feeSuggestion := c.feeSuggestionAny(assetID)
-	if send {
-		if sender, isSender := wallet.Wallet.(asset.Sender); isSender {
-			coin, err = sender.Send(address, value, feeSuggestion)
-		} else {
-			return nil, fmt.Errorf("wallet does not support sending")
-		}
+	if !subtract {
+		coin, err = wallet.Wallet.Send(address, value, feeSuggestion)
 	} else {
 		if withdrawer, isWithdrawer := wallet.Wallet.(asset.Withdrawer); isWithdrawer {
 			coin, err = withdrawer.Withdraw(address, value, feeSuggestion)
 		} else {
-			return nil, fmt.Errorf("wallet does not support withdrawing")
+			return nil, fmt.Errorf("wallet does not support subtracting network fee from withdraw amount")
 		}
 	}
 
 	if err != nil {
-		subject, details := c.formatDetails(TopicWithdrawError, unbip(assetID), err)
-		c.notify(newWithdrawNote(TopicWithdrawError, subject, details, db.ErrorLevel))
+		subject, details := c.formatDetails(TopicSendError, unbip(assetID), err)
+		c.notify(newSendNote(TopicSendError, subject, details, db.ErrorLevel))
 		return nil, err
 	}
 
-	subject, details := c.formatDetails(TopicWithdrawSend, unbip(assetID), coin)
-	c.notify(newWithdrawNote(TopicWithdrawSend, subject, details, db.Success))
+	subject, details := c.formatDetails(TopicSendSucess, unbip(assetID), coin)
+	c.notify(newSendNote(TopicSendSucess, subject, details, db.Success))
 
 	c.updateAssetBalance(assetID)
 	return coin, nil

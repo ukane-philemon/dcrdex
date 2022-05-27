@@ -661,6 +661,7 @@ type ExchangeWalletAccelerator struct {
 var _ asset.Wallet = (*baseWallet)(nil)
 var _ asset.Accelerator = (*ExchangeWalletAccelerator)(nil)
 var _ asset.Accelerator = (*ExchangeWalletSPV)(nil)
+var _ asset.Withdrawer = (*baseWallet)(nil)
 var _ asset.Rescanner = (*ExchangeWalletSPV)(nil)
 var _ asset.FeeRater = (*ExchangeWalletFullNode)(nil)
 var _ asset.LogFiler = (*ExchangeWalletSPV)(nil)
@@ -3534,7 +3535,6 @@ func (btc *baseWallet) EstimateRegistrationTxFee(feeRate uint64) uint64 {
 func (btc *baseWallet) Withdraw(address string, value, feeRate uint64) (asset.Coin, error) {
 	txHash, vout, sent, err := btc.send(address, value, btc.feeRateWithFallback(feeRate), true)
 	if err != nil {
-		btc.log.Errorf("Withdraw error - address = '%s', amount = %s: %v", address, amount(value), err)
 		return nil, err
 	}
 	return newOutput(txHash, vout, sent), nil
@@ -3543,11 +3543,9 @@ func (btc *baseWallet) Withdraw(address string, value, feeRate uint64) (asset.Co
 // Send sends the exact value to the specified address. This is different from
 // Withdraw, which subtracts the tx fees from the amount sent. feeRate is in
 // units of sats/byte.
-// Send satisfies asset.Sender.
 func (btc *baseWallet) Send(address string, value, feeRate uint64) (asset.Coin, error) {
 	txHash, vout, sent, err := btc.send(address, value, btc.feeRateWithFallback(feeRate), false)
 	if err != nil {
-		btc.log.Errorf("Send error - address = '%s', amount = %s: %v", address, amount(value), err)
 		return nil, err
 	}
 	return newOutput(txHash, vout, sent), nil

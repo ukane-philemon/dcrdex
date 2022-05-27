@@ -147,7 +147,6 @@ var PlPL = map[string]string{
 	"New Deposit Address":       "Nowy adres do depozytów",
 	"Address":                   "Adres",
 	"Amount":                    "Ilość",
-	"Authorize the withdraw with your app password.": "Zatwierdź wypłatę swoim hasłem aplikacji.",
 	"Reconfigure":                 "Skonfiguruj ponownie",
 	"pw_change_instructions":      "Zmiana poniższego hasła nie powoduje zmiany hasła do Twojego oprogramowania portfela. Skorzystaj z tego formularza, aby zaktualizować klienta DEX po tym, jak zmienisz hasło do swojego oprogramowania portfela.",
 	"New Wallet Password":         "Nowe hasło portfela",

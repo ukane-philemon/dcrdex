@@ -78,13 +78,13 @@ type cancelForm struct {
 	OrderID dex.Bytes        `json:"orderID"`
 }
 
-// sendOrWithdrawForm is sent to initiate a either a send or withdraw.
+// sendOrWithdrawForm is sent to initiate either a send or withdraw tx.
 type sendOrWithdrawForm struct {
-	AssetID uint32           `json:"assetID"`
-	Value   uint64           `json:"value"`
-	Address string           `json:"address"`
-	Send    bool             `json:"send"`
-	Pass    encode.PassBytes `json:"pw"`
+	AssetID  uint32           `json:"assetID"`
+	Value    uint64           `json:"value"`
+	Address  string           `json:"address"`
+	Subtract bool             `json:"subtract"`
+	Pass     encode.PassBytes `json:"pw"`
 }
 
 type accountExportForm struct {

@@ -435,7 +435,6 @@ type ExchangeWallet struct {
 // Check that ExchangeWallet satisfies the Wallet interface.
 var _ asset.Wallet = (*ExchangeWallet)(nil)
 var _ asset.FeeRater = (*ExchangeWallet)(nil)
-var _ asset.Sender = (*ExchangeWallet)(nil)
 var _ asset.Withdrawer = (*ExchangeWallet)(nil)
 
 type block struct {
@@ -2740,8 +2739,6 @@ func (dcr *ExchangeWallet) PayFee(address string, regFee, feeRate uint64) (asset
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Evaluate SendToAddress rpc and how it deals with the change output
-	// address index to see if it can be used here instead.
 	msgTx, sent, err := dcr.sendToAddress(addr, regFee, dcr.feeRateWithFallback(feeRate))
 	if err != nil {
 		return nil, err
@@ -2781,7 +2778,6 @@ func (dcr *ExchangeWallet) Withdraw(address string, value, feeRate uint64) (asse
 // Send sends the exact value to the specified address. This is different from
 // Withdraw, which subtracts the tx fees from the amount sent. feeRate is in
 // units of atoms/byte.
-// Send satisfies asset.Sender.
 func (dcr *ExchangeWallet) Send(address string, value, feeRate uint64) (asset.Coin, error) {
 	addr, err := stdaddr.DecodeAddress(address, dcr.chainParams)
 	if err != nil {

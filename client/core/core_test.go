@@ -596,6 +596,7 @@ type TXCWallet struct {
 	payFeeSuggestion    uint64
 	payFeeCoin          *tCoin
 	payFeeErr           error
+	sendErr             error
 	addrErr             error
 	signCoinErr         error
 	lastSwaps           *asset.Swaps
@@ -838,9 +839,14 @@ func (w *TXCWallet) PayFee(address string, fee, feeSuggestion uint64) (asset.Coi
 	return w.payFeeCoin, w.payFeeErr
 }
 
+func (w *TXCWallet) Send(address string, value, feeSuggestion uint64) (asset.Coin, error) {
+	w.payFeeSuggestion = feeSuggestion
+	return w.payFeeCoin, w.sendErr
+}
+
 func (w *TXCWallet) Withdraw(address string, value, feeSuggestion uint64) (asset.Coin, error) {
 	w.payFeeSuggestion = feeSuggestion
-	return w.payFeeCoin, w.payFeeErr
+	return w.payFeeCoin, w.sendErr
 }
 
 func (w *TXCWallet) EstimateRegistrationTxFee(feeRate uint64) uint64 {
@@ -2491,7 +2497,7 @@ func TestInitializeClient(t *testing.T) {
 	}
 }
 
-func TestSendOrWithdraw(t *testing.T) {
+func TestSend(t *testing.T) {
 	rig := newTestRig()
 	defer rig.shutdown()
 	tCore := rig.core
@@ -2500,19 +2506,19 @@ func TestSendOrWithdraw(t *testing.T) {
 	address := "addr"
 
 	// Successful
-	_, err := tCore.SendOrWithdraw(tPW, tUTXOAssetA.ID, 1e8, address, false)
+	_, err := tCore.Send(tPW, tUTXOAssetA.ID, 1e8, address, false)
 	if err != nil {
-		t.Fatalf("withdraw/send error: %v", err)
+		t.Fatalf("Send error: %v", err)
 	}
 
 	// 0 value
-	_, err = tCore.SendOrWithdraw(tPW, tUTXOAssetA.ID, 0, address, false)
+	_, err = tCore.Send(tPW, tUTXOAssetA.ID, 0, address, false)
 	if err == nil {
-		t.Fatalf("no error for zero value withdraw/send")
+		t.Fatalf("no error for zero value send")
 	}
 
 	// no wallet
-	_, err = tCore.SendOrWithdraw(tPW, 12345, 1e8, address, false)
+	_, err = tCore.Send(tPW, 12345, 1e8, address, false)
 	if err == nil {
 		t.Fatalf("no error for unknown wallet")
 	}
@@ -2520,23 +2526,23 @@ func TestSendOrWithdraw(t *testing.T) {
 	// connect error
 	wallet.hookedUp = false
 	tWallet.connectErr = tErr
-	_, err = tCore.SendOrWithdraw(tPW, tUTXOAssetA.ID, 1e8, address, false)
+	_, err = tCore.Send(tPW, tUTXOAssetA.ID, 1e8, address, false)
 	if err == nil {
 		t.Fatalf("no error for wallet connect error")
 	}
 	tWallet.connectErr = nil
 
 	// Send error
-	tWallet.payFeeErr = tErr
-	_, err = tCore.SendOrWithdraw(tPW, tUTXOAssetA.ID, 1e8, address, false)
+	tWallet.sendErr = tErr
+	_, err = tCore.Send(tPW, tUTXOAssetA.ID, 1e8, address, false)
 	if err == nil {
-		t.Fatalf("no error for wallet withdraw/send error")
+		t.Fatalf("no error for wallet send error")
 	}
-	tWallet.payFeeErr = nil
+	tWallet.sendErr = nil
 
 	// Check the coin.
 	tWallet.payFeeCoin = &tCoin{id: []byte{'a'}}
-	coin, err := tCore.SendOrWithdraw(tPW, tUTXOAssetA.ID, 1e8, address, false)
+	coin, err := tCore.Send(tPW, tUTXOAssetA.ID, 1e8, address, false)
 	if err != nil {
 		t.Fatalf("coin check error: %v", err)
 	}
@@ -2559,7 +2565,7 @@ func TestSendOrWithdraw(t *testing.T) {
 
 	wallet.Wallet = feeRater
 
-	_, err = tCore.SendOrWithdraw(tPW, tUTXOAssetA.ID, 1e8, address, false)
+	_, err = tCore.Send(tPW, tUTXOAssetA.ID, 1e8, address, false)
 	if err != nil {
 		t.Fatalf("FeeRater Withdraw/send error: %v", err)
 	}
