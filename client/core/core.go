@@ -3065,7 +3065,7 @@ func (c *Core) Register(form *RegisterForm) (*RegisterResult, error) {
 		"Do NOT manually send funds to this address even if this fails.",
 		regRes.Address, dc.acct.id, regRes.Fee, regFeeAssetSymbol)
 	feeRate := c.feeSuggestionAny(feeAsset.ID, dc)
-	coin, err := wallet.PayFee(regRes.Address, regRes.Fee, feeRate)
+	coin, err := wallet.Send(regRes.Address, regRes.Fee, feeRate)
 	if err != nil {
 		return nil, newError(feeSendErr, "error paying registration fee: %w", err)
 	}

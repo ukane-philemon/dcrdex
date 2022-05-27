@@ -1992,9 +1992,8 @@ func TestRefund(t *testing.T) {
 type tSenderType byte
 
 const (
-	tPayFeeSender tSenderType = iota
+	tSendSender tSenderType = iota
 	tWithdrawSender
-	tSendSender
 )
 
 func testSender(t *testing.T, senderType tSenderType) {
@@ -2005,12 +2004,12 @@ func testSender(t *testing.T, senderType tSenderType) {
 	}
 	var sendVal uint64 = 1e8
 	var unspentVal uint64 = 100e8
-	funName := "PayFee"
+	const feeSuggestion = 100
+	funName := "Send"
 	sender := func(addr string, val uint64) (asset.Coin, error) {
-		return wallet.PayFee(addr, val, defaultFee)
+		return wallet.Send(addr, val, feeSuggestion)
 	}
 	if senderType == tWithdrawSender {
-		const feeSuggestion = 100
 		funName = "Withdraw"
 		// For withdraw, test with unspent total = withdraw value
 		unspentVal = sendVal
@@ -2018,13 +2017,7 @@ func testSender(t *testing.T, senderType tSenderType) {
 			return wallet.Withdraw(addr, val, feeSuggestion)
 		}
 	}
-	if senderType == tSendSender {
-		const feeSuggestion = 100
-		funName = "Send"
-		sender = func(addr string, val uint64) (asset.Coin, error) {
-			return wallet.Send(addr, val, feeSuggestion)
-		}
-	}
+
 	addr := tPKHAddr.String()
 	node.changeAddr = tPKHAddr
 
@@ -2051,7 +2044,7 @@ func testSender(t *testing.T, senderType tSenderType) {
 	}
 
 	// GetRawChangeAddress error
-	if senderType == tPayFeeSender { // withdraw test does not get a change address
+	if senderType == tSendSender { // withdraw test does not get a change address
 		node.changeAddrErr = tErr
 		_, err = sender(addr, sendVal)
 		if err == nil {
@@ -2065,10 +2058,6 @@ func testSender(t *testing.T, senderType tSenderType) {
 	if err != nil {
 		t.Fatalf(funName+" error afterwards: %v", err)
 	}
-}
-
-func TestPayFee(t *testing.T) {
-	testSender(t, tPayFeeSender)
 }
 
 func TestWithdraw(t *testing.T) {

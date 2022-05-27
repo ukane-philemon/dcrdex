@@ -593,9 +593,8 @@ func (r *tReceipt) SignedRefund() dex.Bytes {
 }
 
 type TXCWallet struct {
-	payFeeSuggestion    uint64
-	payFeeCoin          *tCoin
-	payFeeErr           error
+	sendFeeSuggestion   uint64
+	sendCoin            *tCoin
 	sendErr             error
 	addrErr             error
 	signCoinErr         error
@@ -834,19 +833,14 @@ func (w *TXCWallet) ConfirmTime(id dex.Bytes, nConfs uint32) (time.Time, error) 
 	return time.Time{}, nil
 }
 
-func (w *TXCWallet) PayFee(address string, fee, feeSuggestion uint64) (asset.Coin, error) {
-	w.payFeeSuggestion = feeSuggestion
-	return w.payFeeCoin, w.payFeeErr
-}
-
 func (w *TXCWallet) Send(address string, value, feeSuggestion uint64) (asset.Coin, error) {
-	w.payFeeSuggestion = feeSuggestion
-	return w.payFeeCoin, w.sendErr
+	w.sendFeeSuggestion = feeSuggestion
+	return w.sendCoin, w.sendErr
 }
 
 func (w *TXCWallet) Withdraw(address string, value, feeSuggestion uint64) (asset.Coin, error) {
-	w.payFeeSuggestion = feeSuggestion
-	return w.payFeeCoin, w.sendErr
+	w.sendFeeSuggestion = feeSuggestion
+	return w.sendCoin, w.sendErr
 }
 
 func (w *TXCWallet) EstimateRegistrationTxFee(feeRate uint64) uint64 {
@@ -1767,7 +1761,7 @@ func TestRegister(t *testing.T) {
 					tCore.waiterMtx.Unlock()
 					if waiterCount > 0 { // when verifyRegistrationFee adds a waiter, then we can trigger tip change
 						timeout.Stop()
-						tWallet.setConfs(tWallet.payFeeCoin.id, 0, nil)
+						tWallet.setConfs(tWallet.sendCoin.id, 0, nil)
 						tCore.tipChange(tUTXOAssetA.ID, nil)
 						return
 					}
@@ -1802,7 +1796,7 @@ func TestRegister(t *testing.T) {
 		Cert:    []byte{0x1}, // not empty signals TLS, otherwise no TLS allowed hidden services
 	}
 
-	tWallet.payFeeCoin = &tCoin{id: encode.RandomBytes(36)}
+	tWallet.sendCoin = &tCoin{id: encode.RandomBytes(36)}
 
 	ch := tCore.NotificationFeed()
 
@@ -1811,7 +1805,7 @@ func TestRegister(t *testing.T) {
 		// Register method will error if url is already in conns map.
 		clearConn()
 
-		tWallet.setConfs(tWallet.payFeeCoin.id, 0, nil)
+		tWallet.setConfs(tWallet.sendCoin.id, 0, nil)
 		_, err = tCore.Register(form)
 	}
 
@@ -2007,15 +2001,15 @@ func TestRegister(t *testing.T) {
 	}
 	form.Fee = tFee
 
-	// PayFee error
+	// Send error
 	queueConfigAndConnectUnknownAcct()
 	rig.queueRegister(regRes)
-	tWallet.payFeeErr = tErr
+	tWallet.sendErr = tErr
 	run()
 	if !errorHasCode(err, feeSendErr) {
-		t.Fatalf("no error for PayFee error")
+		t.Fatalf("no error for sendErr error")
 	}
-	tWallet.payFeeErr = nil
+	tWallet.sendErr = nil
 
 	// notifyfee response error
 	queueConfigAndConnectUnknownAcct()
@@ -2541,7 +2535,7 @@ func TestSend(t *testing.T) {
 	tWallet.sendErr = nil
 
 	// Check the coin.
-	tWallet.payFeeCoin = &tCoin{id: []byte{'a'}}
+	tWallet.sendCoin = &tCoin{id: []byte{'a'}}
 	coin, err := tCore.Send(tPW, tUTXOAssetA.ID, 1e8, address, false)
 	if err != nil {
 		t.Fatalf("coin check error: %v", err)
@@ -2552,7 +2546,7 @@ func TestSend(t *testing.T) {
 	}
 
 	// So far, the fee suggestion should have always been zero.
-	if tWallet.payFeeSuggestion != 0 {
+	if tWallet.sendFeeSuggestion != 0 {
 		t.Fatalf("unexpected non-zero fee rate when no books or responses prepared")
 	}
 
@@ -2570,8 +2564,8 @@ func TestSend(t *testing.T) {
 		t.Fatalf("FeeRater Withdraw/send error: %v", err)
 	}
 
-	if tWallet.payFeeSuggestion != feeRate {
-		t.Fatalf("unexpected fee rate from FeeRater. wanted %d, got %d", feeRate, tWallet.payFeeSuggestion)
+	if tWallet.sendFeeSuggestion != feeRate {
+		t.Fatalf("unexpected fee rate from FeeRater. wanted %d, got %d", feeRate, tWallet.sendFeeSuggestion)
 	}
 }
 

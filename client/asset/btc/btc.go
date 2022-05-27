@@ -3430,16 +3430,10 @@ func (btc *baseWallet) NewAddress() (string, error) {
 	return btc.Address()
 }
 
-// PayFee sends the dex registration fee. Transaction fees are in addition to
-// the registration fee, and the fee rate is taken from the DEX configuration.
-func (btc *baseWallet) PayFee(address string, regFee, feeRate uint64) (asset.Coin, error) {
-	return btc.Send(address, regFee, feeRate)
-}
-
 // EstimateRegistrationTxFee returns an estimate for the tx fee needed to
 // pay the registration fee using the provided feeRate.
 func (btc *baseWallet) EstimateRegistrationTxFee(feeRate uint64) uint64 {
-	const inputCount = 5 // buffer so this estimate is higher than what PayFee uses
+	const inputCount = 5 // buffer so this estimate is higher than actual reg tx fee.
 	if feeRate == 0 || feeRate > btc.feeRateLimit {
 		feeRate = btc.fallbackFeeRate
 	}

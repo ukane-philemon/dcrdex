@@ -425,7 +425,7 @@ export default class WalletsPage extends BasePage {
     const wallet = app().walletMap[assetID]
     if ((wallet.traits & traitLogFiler) !== 0) Doc.show(page.downloadLogs)
     else Doc.hide(page.downloadLogs)
-    if ((wallet.traits & traitRecoverer)) Doc.show(page.recoverWallet)
+    if ((wallet.traits & traitRecoverer) !== 0) Doc.show(page.recoverWallet)
     else Doc.hide(page.recoverWallet)
 
     page.recfgAssetLogo.src = Doc.logoPath(asset.symbol)

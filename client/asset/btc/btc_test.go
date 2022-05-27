@@ -2342,9 +2342,8 @@ func testLockUnlock(t *testing.T, segwit bool, walletType string) {
 type tSenderType byte
 
 const (
-	tPayFeeSender tSenderType = iota
+	tSendSender tSenderType = iota
 	tWithdrawSender
-	tSendSender
 )
 
 func testSender(t *testing.T, senderType tSenderType, segwit bool, walletType string) {
@@ -2355,18 +2354,14 @@ func testSender(t *testing.T, senderType tSenderType, segwit bool, walletType st
 	}
 	const feeSuggestion = 100
 	sender := func(addr string, val uint64) (asset.Coin, error) {
-		return wallet.PayFee(addr, val, defaultFee)
+		return wallet.Send(addr, val, defaultFee)
 	}
 	if senderType == tWithdrawSender {
 		sender = func(addr string, val uint64) (asset.Coin, error) {
 			return wallet.Withdraw(addr, val, feeSuggestion)
 		}
 	}
-	if senderType == tSendSender {
-		sender = func(addr string, val uint64) (asset.Coin, error) {
-			return wallet.Send(addr, val, feeSuggestion)
-		}
-	}
+
 	addr := btcAddr(segwit)
 	fee := float64(1) // BTC
 	node.setTxFee = true
@@ -2429,14 +2424,8 @@ func testSender(t *testing.T, senderType tSenderType, segwit bool, walletType st
 	// good again
 	_, err = sender(addr.String(), toSatoshi(fee))
 	if err != nil {
-		t.Fatalf("PayFee error afterwards: %v", err)
+		t.Fatalf("Send error afterwards: %v", err)
 	}
-}
-
-func TestPayFee(t *testing.T) {
-	runRubric(t, func(t *testing.T, segwit bool, walletType string) {
-		testSender(t, tPayFeeSender, segwit, walletType)
-	})
 }
 
 func TestEstimateRegistrationTxFee(t *testing.T) {
