@@ -2732,28 +2732,10 @@ func (dcr *ExchangeWallet) Locked() bool {
 	return false
 }
 
-// PayFee sends the dex registration fee. Transaction fees are in addition to
-// the registration fee, and the fee rate is taken from the DEX configuration.
-func (dcr *ExchangeWallet) PayFee(address string, regFee, feeRate uint64) (asset.Coin, error) {
-	addr, err := stdaddr.DecodeAddress(address, dcr.chainParams)
-	if err != nil {
-		return nil, err
-	}
-	msgTx, sent, err := dcr.sendToAddress(addr, regFee, dcr.feeRateWithFallback(feeRate))
-	if err != nil {
-		return nil, err
-	}
-	if sent != regFee {
-		return nil, fmt.Errorf("transaction %s was sent, but the reported value sent was unexpected. "+
-			"expected %.8f, but %.8f was reported", msgTx.CachedTxHash(), toDCR(regFee), toDCR(sent))
-	}
-	return newOutput(msgTx.CachedTxHash(), 0, regFee, wire.TxTreeRegular), nil
-}
-
 // EstimateRegistrationTxFee returns an estimate for the tx fee needed to
 // pay the registration fee using the provided feeRate.
 func (dcr *ExchangeWallet) EstimateRegistrationTxFee(feeRate uint64) uint64 {
-	const inputCount = 5 // buffer so this estimate is higher than what PayFee uses
+	const inputCount = 5 // buffer so this estimate is higher than actual reg tx fee.
 	if feeRate == 0 || feeRate > dcr.feeRateLimit {
 		feeRate = dcr.fallbackFeeRate
 	}

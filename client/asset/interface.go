@@ -92,6 +92,7 @@ func DetermineWalletTraits(w Wallet) (t WalletTrait) {
 	}
 	if _, is := w.(Recoverer); is {
 		t |= WalletTraitRecoverer
+	}
 	if _, is := w.(Withdrawer); is {
 		t |= WalletTraitWithdrawer
 	}
@@ -337,9 +338,6 @@ type Wallet interface {
 	Lock() error
 	// Locked will be true if the wallet is currently locked.
 	Locked() bool
-	// PayFee sends the dex registration fee. Transaction fees are in addition to
-	// the registration fee, and the feeSuggestion is gotten from the server.
-	PayFee(address string, feeAmt, feeRate uint64) (Coin, error)
 	// SwapConfirmations gets the number of confirmations and the spend status
 	// for the specified swap. If the swap was not funded by this wallet, and
 	// it is already spent, you may see CoinNotFoundError.
@@ -412,7 +410,7 @@ type LogFiler interface {
 // not be known on construction, only connect, a zero rate may be returned. The
 // caller should always check for zero and have a fallback rate. The rates from
 // FeeRate should be used for rates that are not validated by the server
-// (Withdraw, Send, PayFee), and will/should not be used to generate a fee
+// Withdraw and Send, and will/should not be used to generate a fee
 // suggestion for swap operations.
 type FeeRater interface {
 	FeeRate() uint64
