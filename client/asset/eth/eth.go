@@ -2066,7 +2066,7 @@ func (w *ETHWallet) Send(addr string, value, _ uint64) (asset.Coin, error) {
 	}
 	maxFeeRate, err := w.recommendedMaxFeeRate(w.ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error getting max fee rate: %v", err)
+		return nil, fmt.Errorf("error getting max fee rate: %w", err)
 	}
 
 	maxFee := defaultSendGasLimit * dexeth.WeiToGwei(maxFeeRate)
@@ -2114,7 +2114,7 @@ func (w *TokenWallet) Send(addr string, value, _ uint64) (asset.Coin, error) {
 
 	maxFeeRate, err := w.recommendedMaxFeeRate(w.ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error getting max fee rate: %v", err)
+		return nil, fmt.Errorf("error getting max fee rate: %w", err)
 	}
 
 	maxFee := dexeth.WeiToGwei(maxFeeRate) * g.Transfer

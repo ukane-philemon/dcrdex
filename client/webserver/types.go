@@ -78,7 +78,7 @@ type cancelForm struct {
 	OrderID dex.Bytes        `json:"orderID"`
 }
 
-// sendOrWithdrawForm is sent to initiate either a send or withdraw tx.
+// sendOrWithdrawForm is sent to initiate either send or withdraw tx.
 type sendOrWithdrawForm struct {
 	AssetID  uint32           `json:"assetID"`
 	Value    uint64           `json:"value"`

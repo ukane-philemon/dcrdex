@@ -4033,7 +4033,7 @@ func (c *Core) feeSuggestion(dc *dexConnection, assetID uint32) (feeSuggestion u
 	return dc.fetchFeeRate(assetID)
 }
 
-// Send initiates either a send or withdraw from an exchange wallet. if subtract
+// Send initiates either send or withdraw from an exchange wallet. if subtract
 // is true, fees are subtracted from the value else fees are taken from the
 // exchange wallet. The client password must be provided as an additional
 // verification.
@@ -4054,6 +4054,7 @@ func (c *Core) Send(pw []byte, assetID uint32, value uint64, address string, sub
 	if err != nil {
 		return nil, err
 	}
+
 	var coin asset.Coin
 	feeSuggestion := c.feeSuggestionAny(assetID)
 	if !subtract {
@@ -4065,15 +4066,14 @@ func (c *Core) Send(pw []byte, assetID uint32, value uint64, address string, sub
 			return nil, fmt.Errorf("wallet does not support subtracting network fee from withdraw amount")
 		}
 	}
-
 	if err != nil {
 		subject, details := c.formatDetails(TopicSendError, unbip(assetID), err)
 		c.notify(newSendNote(TopicSendError, subject, details, db.ErrorLevel))
 		return nil, err
 	}
 
-	subject, details := c.formatDetails(TopicSendSucess, unbip(assetID), coin)
-	c.notify(newSendNote(TopicSendSucess, subject, details, db.Success))
+	subject, details := c.formatDetails(TopicSendSuccess, unbip(assetID), coin)
+	c.notify(newSendNote(TopicSendSuccess, subject, details, db.Success))
 
 	c.updateAssetBalance(assetID)
 	return coin, nil

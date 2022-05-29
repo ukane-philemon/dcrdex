@@ -65,7 +65,7 @@ var enUS = map[Topic]*translation{
 		template: "Error encountered while sending %s: %v",
 	},
 	// [ticker, coin ID]
-	TopicSendSucess: {
+	TopicSendSuccess: {
 		subject:  "Send Successful",
 		template: "Sending %s has completed successfully. Coin ID = %s",
 	},
@@ -351,7 +351,7 @@ var ptBR = map[Topic]*translation{
 		template: "Erro encontrado durante retirada de %s: %v",
 	},
 	// [ticker, coin ID]
-	TopicSendSucess: {
+	TopicSendSuccess: {
 		template: "Retirada de %s foi completada com sucesso. ID da moeda = %s",
 		subject:  "Retirada Enviada",
 	},
@@ -638,7 +638,7 @@ var zhCN = map[Topic]*translation{
 		template: "在 %s 提取过程中遇到错误: %v", // alt. 删除 %s 时遇到错误： %v
 	},
 	// [ticker, coin ID]
-	TopicSendSucess: {
+	TopicSendSuccess: {
 		subject:  "提款已发送",
 		template: "%s 的提款已成功完成。硬币 ID = %s",
 	},
@@ -924,7 +924,7 @@ var plPL = map[Topic]*translation{
 		template: "Wystąpił błąd przy wypłacaniu %s: %v",
 	},
 	// [ticker, coin ID]
-	TopicSendSucess: {
+	TopicSendSuccess: {
 		subject:  "Wypłata zrealizowana",
 		template: "Wypłata %s została zrealizowana pomyślnie. ID monety = %s",
 	},

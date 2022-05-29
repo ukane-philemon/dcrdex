@@ -2160,7 +2160,6 @@ func Test_withdraw(t *testing.T) {
 	if unspentVal != uint64(msgTx.TxOut[1].Value) {
 		t.Errorf("expected change output to be %d, got %d", unspentVal, msgTx.TxOut[1].Value)
 	}
-
 }
 
 func Test_sendToAddress(t *testing.T) {

@@ -545,19 +545,16 @@ func Run(t *testing.T, cfg *Config) {
 	tLogger.Infof("Sent with %s", coin.String())
 
 	// Test Withdraw.
-	if withdrawer, isWithdrawer := rig.secondWallet.Wallet.(asset.Withdrawer); isWithdrawer {
-		tLogger.Info("Testing Withdraw")
-		coin, err = withdrawer.Withdraw(address, cfg.LotSize, 100)
-		if err != nil {
-			t.Fatalf("error withdrawing: %v", err)
-		}
-		if coin.Value() >= cfg.LotSize {
-			t.Fatalf("Expected less than %d got %d", cfg.LotSize, coin.Value())
-		}
-		tLogger.Infof("Withdrew with %s", coin.String())
-	} else {
-		t.Fatal("Expected to support withdrawing")
+	withdrawer, _ := rig.secondWallet.Wallet.(asset.Withdrawer)
+	tLogger.Info("Testing Withdraw")
+	coin, err = withdrawer.Withdraw(address, cfg.LotSize, 100)
+	if err != nil {
+		t.Fatalf("error withdrawing: %v", err)
 	}
+	if coin.Value() >= cfg.LotSize {
+		t.Fatalf("Expected less than %d got %d", cfg.LotSize, coin.Value())
+	}
+	tLogger.Infof("Withdrew with %s", coin.String())
 
 	if cfg.SPV {
 		mine()
