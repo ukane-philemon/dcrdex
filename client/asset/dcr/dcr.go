@@ -3021,7 +3021,7 @@ func (dcr *ExchangeWallet) sendCoins(addr stdaddr.Address, coins asset.Coins, va
 
 	tx, err := dcr.sendWithReturn(baseTx, feeRate, feeSource)
 	if err != nil {
-		if retErr := dcr.returnCoins(coins); retErr != nil {
+		if _, retErr := dcr.returnCoins(coins); retErr != nil {
 			dcr.log.Errorf("Failed to unlock coins: %v", retErr)
 		}
 		return nil, 0, err
