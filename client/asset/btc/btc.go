@@ -143,7 +143,7 @@ var (
 		{
 			Key:         "fallbackfee",
 			DisplayName: "Fallback fee rate",
-			Description: "The fee rate to use for fee payment and withdrawals when" +
+			Description: "The fee rate to use for sending or withdrawing funds and fee payment when" +
 				" estimatesmartfee is not available. Units: BTC/kB",
 			DefaultValue: defaultFee * 1000 / 1e8,
 		},

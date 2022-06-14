@@ -2062,7 +2062,7 @@ func (w *ETHWallet) Send(addr string, value, _ uint64) (asset.Coin, error) {
 	}
 	avail := bal.Available
 	if avail < value {
-		return nil, fmt.Errorf("not enough funds to withdraw: have %d gwei need %d gwei", avail, value)
+		return nil, fmt.Errorf("not enough funds to send: have %d gwei need %d gwei", avail, value)
 	}
 	maxFeeRate, err := w.recommendedMaxFeeRate(w.ctx)
 	if err != nil {
@@ -2071,7 +2071,7 @@ func (w *ETHWallet) Send(addr string, value, _ uint64) (asset.Coin, error) {
 
 	maxFee := defaultSendGasLimit * dexeth.WeiToGwei(maxFeeRate)
 	if avail < value+maxFee {
-		return nil, fmt.Errorf("not enough funds to withdraw: cannot cover value %d, max fee of %d gwei", value, maxFee)
+		return nil, fmt.Errorf("not enough funds to send: cannot cover value %d, max fee of %d gwei", value, maxFee)
 	}
 	// TODO: Subtract option.
 	// if avail < value+maxFee {
