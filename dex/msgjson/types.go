@@ -36,7 +36,7 @@ const (
 	RPCArgumentsError                    // 17
 	RPCTradeError                        // 18
 	RPCCancelError                       // 19
-	RPCWithdrawError                     // 20
+	RPCFundTransferError                 // 20
 	RPCOrderBookError                    // 21
 	SignatureError                       // 22
 	SerializationError                   // 23
@@ -80,7 +80,6 @@ const (
 	RPCDiscoverAcctError                 // 61
 	RPCWalletRescanError                 // 62
 	RPCDeleteArchivedRecordsError        // 63
-	RPCSendError                         // 64
 )
 
 // Routes are destinations for a "payload" of data. The type of data being
