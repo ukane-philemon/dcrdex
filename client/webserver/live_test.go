@@ -535,6 +535,9 @@ func (c *TCore) Register(r *core.RegisterForm) (*core.RegisterResult, error) {
 func (c *TCore) EstimateRegistrationTxFee(host string, certI interface{}, assetID uint32) (uint64, error) {
 	return 0, nil
 }
+func (c *TCore) EstimateSendTxFee(assetID uint32, value uint64, subtract bool) (fee uint64, err error) {
+	return 0, nil
+}
 func (c *TCore) Login([]byte) (*core.LoginResult, error) { return &core.LoginResult{}, nil }
 func (c *TCore) IsInitialized() bool                     { return true }
 func (c *TCore) Logout() error                           { return nil }

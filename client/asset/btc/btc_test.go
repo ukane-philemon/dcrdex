@@ -800,7 +800,7 @@ func testAvailableFund(t *testing.T, segwit bool, walletType string) {
 	blockHash, _ := node.addRawTx(blockHeight, msgTx)
 
 	node.getTransactionMap = map[string]*GetTransactionResult{
-		"any": &GetTransactionResult{
+		"any": {
 			BlockHash:  blockHash.String(),
 			BlockIndex: blockHeight,
 			Details: []*WalletTxDetails{
@@ -2388,7 +2388,7 @@ func testSender(t *testing.T, senderType tSenderType, segwit bool, walletType st
 
 	node.sendToAddress = txHash.String()
 	node.getTransactionMap = map[string]*GetTransactionResult{
-		"any": &GetTransactionResult{
+		"any": {
 			BlockHash:  blockHash.String(),
 			BlockIndex: blockHeight,
 			Hex:        txB,
@@ -2467,6 +2467,94 @@ func testEstimateRegistrationTxFee(t *testing.T, segwit bool, walletType string)
 	estimate = wallet.EstimateRegistrationTxFee(wallet.feeRateLimit + 1)
 	if estimate != wallet.fallbackFeeRate*txSize {
 		t.Fatalf("expected tx fee to be %d but got %d", wallet.fallbackFeeRate*txSize, estimate)
+	}
+}
+
+func TestEstimateSendTxFee(t *testing.T) {
+	runRubric(t, testEstimateSendTxFee)
+}
+
+func testEstimateSendTxFee(t *testing.T, segwit bool, walletType string) {
+	wallet, node, shutdown, err := tNewWallet(segwit, walletType)
+	defer shutdown()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	addr := btcAddr(segwit)
+	node.changeAddr = btcAddr(segwit).String()
+	pkScript, _ := txscript.PayToAddrScript(addr)
+
+	unspentVal := 100 // BTC
+	unspents := []*ListUnspentResult{{
+		Address:       addr.String(),
+		Amount:        float64(unspentVal),
+		Confirmations: 1,
+		Vout:          1,
+		ScriptPubKey:  pkScript,
+		SafePtr:       boolPtr(true),
+		Spendable:     true,
+	}}
+	node.listUnspent = unspents
+	var bals GetBalancesResult
+	node.getBalances = &bals
+	bals.Mine.Trusted = float64(unspentVal)
+	unspentSats := toSatoshi(unspents[0].Amount)
+
+	// single ouptput size.
+	opSize := dexbtc.P2PKHOutputSize
+	if segwit {
+		opSize = dexbtc.P2WPKHOutputSize
+	}
+
+	// bSize is the size for a single input.
+	witnessWeight := 4
+	bSize := dexbtc.TxInOverhead +
+		wire.VarIntSerializeSize(uint64(dexbtc.RedeemP2PKHSigScriptSize)) +
+		dexbtc.RedeemP2PKHSigScriptSize + (witnessWeight-1)/witnessWeight
+	if segwit {
+		bSize = dexbtc.TxInOverhead + 1 + (dexbtc.RedeemP2WPKHInputWitnessWeight+
+			(witnessWeight-1))/witnessWeight
+	}
+
+	txSize := dexbtc.MinimumTxOverhead + bSize + opSize
+	minEstFee := optimalFeeRate * uint64(txSize)
+
+	// This should return fee estimate for one output.
+	estimate, err := wallet.EstimateSendTxFee(unspentSats, optimalFeeRate, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if estimate != minEstFee {
+		t.Fatalf("expected estimate to be %v, got %v)", minEstFee, estimate)
+	}
+
+	// This should return fee estimate for two output.
+	minEstFeeWithEstChangeFee := uint64(txSize+opSize) * optimalFeeRate
+	estimate, err = wallet.EstimateSendTxFee(unspentSats/2, optimalFeeRate, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if estimate != minEstFeeWithEstChangeFee {
+		t.Fatalf("expected estimate to be %v, got %v)", minEstFeeWithEstChangeFee, estimate)
+	}
+
+	// This should return an error, not enough funds to cover fees.
+	_, err = wallet.EstimateSendTxFee(unspentSats, optimalFeeRate, false)
+	if err == nil {
+		t.Fatal("Expected error not enough to cover funds required")
+	}
+
+	dust := 0.00000016
+	node.listUnspent[0].Amount += dust
+	// This should return fee estimate for one output with dust added to fee.
+	minFeeWithDust := minEstFee + toSatoshi(dust)
+	estimate, err = wallet.EstimateSendTxFee(unspentSats, optimalFeeRate, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if estimate != minFeeWithDust {
+		t.Fatalf("expected estimate to be %v, got %v)", minFeeWithDust, estimate)
 	}
 }
 
@@ -2553,7 +2641,7 @@ func testConfirmations(t *testing.T, segwit bool, walletType string) {
 	txB, _ := serializeMsgTx(tx)
 
 	node.getTransactionMap = map[string]*GetTransactionResult{
-		"any": &GetTransactionResult{
+		"any": {
 			BlockHash: blockHash.String(),
 			Hex:       txB,
 		}}
@@ -3878,7 +3966,7 @@ func testGetTxFee(t *testing.T, segwit bool, walletType string) {
 	}
 
 	node.getTransactionMap = map[string]*GetTransactionResult{
-		"any": &GetTransactionResult{
+		"any": {
 			Hex: txBytes,
 		},
 	}
