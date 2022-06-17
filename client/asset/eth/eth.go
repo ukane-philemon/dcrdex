@@ -2019,9 +2019,12 @@ func (w *TokenWallet) EstimateRegistrationTxFee(feeRate uint64) uint64 {
 
 // EstimateSendTxFee returns a tx fee estimate for sending provided amount using
 // the provided feeRate.
-func (w *ETHWallet) EstimateSendTxFee(value, feeRate uint64, subtract bool) (fee uint64, err error) {
+func (w *ETHWallet) EstimateSendTxFee(address string, value, feeRate uint64, subtract bool) (fee uint64, err error) {
 	if subtract {
 		return 0, fmt.Errorf("wallet does not support checking network fee for withdrawal")
+	}
+	if !common.IsHexAddress(address) {
+		return 0, fmt.Errorf("invalid hex address %q", address)
 	}
 	bal, err := w.Balance()
 	if err != nil {
@@ -2047,9 +2050,12 @@ func (w *ETHWallet) EstimateSendTxFee(value, feeRate uint64, subtract bool) (fee
 
 // EstimateSendTxFee returns a tx fee estimate for sending provided amount using
 // the provided feeRate.
-func (w *TokenWallet) EstimateSendTxFee(value, feeRate uint64, subtract bool) (fee uint64, err error) {
+func (w *TokenWallet) EstimateSendTxFee(address string, value, feeRate uint64, subtract bool) (fee uint64, err error) {
 	if subtract {
 		return 0, fmt.Errorf("wallet does not support checking network fee for withdrawal.")
+	}
+	if !common.IsHexAddress(address) {
+		return 0, fmt.Errorf("invalid hex address %q", address)
 	}
 	bal, err := w.Balance()
 	if err != nil {

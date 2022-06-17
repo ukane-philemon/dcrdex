@@ -258,10 +258,11 @@ export default class WalletsPage extends BasePage {
     const value = Math.round(parseFloat(page.sendAmt.value || '') * conversionFactor)
     // We don't want to be on the confirm page without at least an address.
     if (page.sendAddr.value === '') {
-      page.sendErr.textContent = 'address field cannot be empty'
+      page.sendErr.textContent = intl.prep(intl.ID_NO_ADDRESS_MSG)
       return
     }
     const open = {
+      address: page.sendAddr.value,
       assetID: assetID,
       subtract: subtract,
       value: value

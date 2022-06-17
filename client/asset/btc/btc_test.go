@@ -2481,13 +2481,14 @@ func testEstimateSendTxFee(t *testing.T, segwit bool, walletType string) {
 		t.Fatal(err)
 	}
 
-	addr := btcAddr(segwit)
+	tAddr := btcAddr(segwit)
 	node.changeAddr = btcAddr(segwit).String()
-	pkScript, _ := txscript.PayToAddrScript(addr)
+	pkScript, _ := txscript.PayToAddrScript(tAddr)
+	addr := tAddr.String()
 
 	unspentVal := 100 // BTC
 	unspents := []*ListUnspentResult{{
-		Address:       addr.String(),
+		Address:       addr,
 		Amount:        float64(unspentVal),
 		Confirmations: 1,
 		Vout:          1,
@@ -2501,60 +2502,60 @@ func testEstimateSendTxFee(t *testing.T, segwit bool, walletType string) {
 	bals.Mine.Trusted = float64(unspentVal)
 	unspentSats := toSatoshi(unspents[0].Amount)
 
-	// single ouptput size.
-	opSize := dexbtc.P2PKHOutputSize
+	// inputSize is the size for a single input.
+	inputSize := dexbtc.TxInOverhead +
+		wire.VarIntSerializeSize(uint64(dexbtc.RedeemP2PKHSigScriptSize))
 	if segwit {
-		opSize = dexbtc.P2WPKHOutputSize
+		inputSize = dexbtc.TxInOverhead + 1
 	}
 
-	// bSize is the size for a single input.
-	witnessWeight := 4
-	bSize := dexbtc.TxInOverhead +
-		wire.VarIntSerializeSize(uint64(dexbtc.RedeemP2PKHSigScriptSize)) +
-		dexbtc.RedeemP2PKHSigScriptSize + (witnessWeight-1)/witnessWeight
-	if segwit {
-		bSize = dexbtc.TxInOverhead + 1 + (dexbtc.RedeemP2WPKHInputWitnessWeight+
-			(witnessWeight-1))/witnessWeight
-	}
+	estSendTxFee := func(addr btcutil.Address, amt, feeRate uint64) uint64 {
+		baseTx, err := wallet.createSimpleTx(tAddr, unspentSats)
+		if err != nil {
+			t.Fatal(err)
+		}
+		txSize := baseTx.SerializeSize() + inputSize
+		return uint64(txSize) * optimalFeeRate
 
-	txSize := dexbtc.MinimumTxOverhead + bSize + opSize
-	minEstFee := optimalFeeRate * uint64(txSize)
+	}
 
 	// This should return fee estimate for one output.
-	estimate, err := wallet.EstimateSendTxFee(unspentSats, optimalFeeRate, true)
+	estFee := estSendTxFee(tAddr, unspentSats, optimalFeeRate)
+	estimate, err := wallet.EstimateSendTxFee(addr, unspentSats, optimalFeeRate, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if estimate != minEstFee {
-		t.Fatalf("expected estimate to be %v, got %v)", minEstFee, estimate)
-	}
-
-	// This should return fee estimate for two output.
-	minEstFeeWithEstChangeFee := uint64(txSize+opSize) * optimalFeeRate
-	estimate, err = wallet.EstimateSendTxFee(unspentSats/2, optimalFeeRate, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if estimate != minEstFeeWithEstChangeFee {
-		t.Fatalf("expected estimate to be %v, got %v)", minEstFeeWithEstChangeFee, estimate)
-	}
-
-	// This should return an error, not enough funds to cover fees.
-	_, err = wallet.EstimateSendTxFee(unspentSats, optimalFeeRate, false)
-	if err == nil {
-		t.Fatal("Expected error not enough to cover funds required")
+	if estimate != estFee {
+		t.Fatalf("expected estimate to be %v, got %v)", estFee, estimate)
 	}
 
 	dust := 0.00000016
 	node.listUnspent[0].Amount += dust
 	// This should return fee estimate for one output with dust added to fee.
-	minFeeWithDust := minEstFee + toSatoshi(dust)
-	estimate, err = wallet.EstimateSendTxFee(unspentSats, optimalFeeRate, true)
+	minFeeWithDust := estFee + toSatoshi(dust)
+	estimate, err = wallet.EstimateSendTxFee(addr, unspentSats, optimalFeeRate, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if estimate != minFeeWithDust {
 		t.Fatalf("expected estimate to be %v, got %v)", minFeeWithDust, estimate)
+	}
+
+	// This should return fee estimate for two output.
+	changeFee := uint64(wallet.outputSize()) * optimalFeeRate
+	estFeeWithChange := changeFee + estSendTxFee(tAddr, unspentSats/2, optimalFeeRate)
+	estimate, err = wallet.EstimateSendTxFee(addr, unspentSats/2, optimalFeeRate, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if estimate != estFeeWithChange {
+		t.Fatalf("expected estimate to be %v, got %v)", estFeeWithChange, estimate)
+	}
+
+	// This should return an error, not enough funds to cover fees.
+	_, err = wallet.EstimateSendTxFee(addr, unspentSats, optimalFeeRate, false)
+	if err == nil {
+		t.Fatal("Expected error not enough to cover funds required")
 	}
 }
 

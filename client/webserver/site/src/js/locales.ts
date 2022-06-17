@@ -49,6 +49,7 @@ export const ID_CHANGE_WALLET_TYPE = 'ID_CHANGE_WALLET_TYPE'
 export const ID_KEEP_WALLET_TYPE = 'ID_KEEP_WALLET_TYPE'
 export const WALLET_READY = 'WALLET_READY'
 export const SETUP_NEEDED = 'SETUP_NEEDED'
+export const ID_NO_ADDRESS_MSG = 'ID_NO_ADDRESS_MSG'
 
 export const enUS: Locale = {
   [ID_NO_PASS_ERROR_MSG]: 'password cannot be empty',
@@ -99,7 +100,8 @@ export const enUS: Locale = {
   [ID_CHANGE_WALLET_TYPE]: 'change the wallet type',
   [ID_KEEP_WALLET_TYPE]: 'don\'t change the wallet type',
   [WALLET_READY]: 'Wallet Ready',
-  [SETUP_NEEDED]: 'Setup Needed'
+  [SETUP_NEEDED]: 'Setup Needed',
+  [ID_NO_ADDRESS_MSG]: 'address field cannot be empty'
 }
 
 export const ptBR: Locale = {
@@ -151,7 +153,8 @@ export const ptBR: Locale = {
   [ID_CHANGE_WALLET_TYPE]: 'trocar o tipo de carteira',
   [ID_KEEP_WALLET_TYPE]: 'Não trocara tipo de carteira',
   [WALLET_READY]: 'Carteira Pronta',
-  [SETUP_NEEDED]: 'Configuração Necessária'
+  [SETUP_NEEDED]: 'Configuração Necessária',
+  [ID_NO_ADDRESS_MSG]: 'address field cannot be empty' // translate
 }
 
 export const zhCN: Locale = {
@@ -199,7 +202,8 @@ export const zhCN: Locale = {
   [ID_ADD]: '加',
   [ID_CREATE]: '创建',
   [ID_WALLET_READY]: 'Choose Wallet', // xxx translate
-  [ID_SETUP_WALLET]: 'Setup' // xxx translate
+  [ID_SETUP_WALLET]: 'Setup', // xxx translate
+  [ID_NO_ADDRESS_MSG]: 'address field cannot be empty' // translate
 }
 
 export const plPL: Locale = {
@@ -251,7 +255,8 @@ export const plPL: Locale = {
   [ID_CHANGE_WALLET_TYPE]: 'zmień typ portfela',
   [ID_KEEP_WALLET_TYPE]: 'nie zmieniaj typu portfela',
   [WALLET_READY]: 'Portfel jest gotowy',
-  [SETUP_NEEDED]: 'Potrzebna konfiguracja'
+  [SETUP_NEEDED]: 'Potrzebna konfiguracja',
+  [ID_NO_ADDRESS_MSG]: 'address field cannot be empty' // translate
 }
 
 const localesMap: Record<string, Locale> = {

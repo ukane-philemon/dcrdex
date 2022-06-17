@@ -3268,17 +3268,22 @@ func (dcr *ExchangeWallet) signTxAndAddChange(baseTx *wire.MsgTx, feeRate uint64
 		change = newOutput(&txHash, uint32(len(msgTx.TxOut)-1), uint64(changeOutput.Value), wire.TxTreeRegular)
 		changeAddr = changeAddress.String()
 	}
-
+	dcr.log.Debugf("SEND txsize:%v estFee:%v feeRate:%v baseTx:%v", size, lastFee, feeRate, baseTx)
 	return msgTx, change, changeAddr, lastFee, nil
 }
 
 // EstimateSendTxFee returns a tx fee estimate for sending or withdrawing the
 // provided amount using the provided feeRate.
-func (dcr *ExchangeWallet) EstimateSendTxFee(sendAmount, feeRate uint64, subtract bool) (fee uint64, err error) {
+func (dcr *ExchangeWallet) EstimateSendTxFee(address string, sendAmount, feeRate uint64, subtract bool) (fee uint64, err error) {
 	// Keep a consistent view of spendable and locked coins in the wallet and
 	// the fundingCoins map to make this safe for concurrent use.
 	dcr.fundingMtx.Lock()
 	defer dcr.fundingMtx.Unlock()
+
+	addr, err := stdaddr.DecodeAddress(address, dcr.chainParams)
+	if err != nil {
+		return 0, err
+	}
 
 	if sendAmount == 0 {
 		return 0, fmt.Errorf("cannot check fee: send amount= 0")
@@ -3290,7 +3295,7 @@ func (dcr *ExchangeWallet) EstimateSendTxFee(sendAmount, feeRate uint64, subtrac
 		return 0, err
 	}
 
-	minTxSize := dexdcr.MsgTxOverhead + dexdcr.P2PKHOutputSize
+	baseTx := dcr.createSimpleTx(addr, sendAmount)
 
 	// If not send, select enough inputs for amount. Fees will be taken from the
 	// amount. If send, select enough inputs to cover minimum fees.
@@ -3298,7 +3303,7 @@ func (dcr *ExchangeWallet) EstimateSendTxFee(sendAmount, feeRate uint64, subtrac
 		if subtract {
 			return sum+toAtoms(unspent.rpc.Amount) >= sendAmount
 		}
-		minFee := (uint32(minTxSize) + inputSize) * uint32(feeRate)
+		minFee := (uint32(baseTx.SerializeSize()) + inputSize) * uint32(feeRate)
 		return sum+toAtoms(unspent.rpc.Amount) >= sendAmount+uint64(minFee)
 	}
 
@@ -3306,15 +3311,18 @@ func (dcr *ExchangeWallet) EstimateSendTxFee(sendAmount, feeRate uint64, subtrac
 	if err != nil {
 		return 0, err
 	}
-
-	totalIn, vSize, _, _, _, err := dcr.tryFund(utxos, enough)
+	_, _, coins, _, _, err := dcr.tryFund(utxos, enough)
+	if err != nil {
+		return 0, err
+	}
+	_, err = dcr.addInputCoins(baseTx, coins)
 	if err != nil {
 		return 0, err
 	}
 
-	txSize := uint32(minTxSize) + vSize
-	estFee := uint64(txSize) * feeRate
-	remaining := totalIn - sendAmount
+	_, _, remaining, _, txSize := reduceMsgTx(baseTx)
+	estFee := txSize * feeRate
+	dcr.log.Debugf("ESTIMATESENDTXFEE txsize:%v estFee:%v feeRate:%v baseTx:%v", txSize, estFee, feeRate, baseTx)
 
 	// Check if there will be a change output if there is enough remaining.
 	changeFee := dexdcr.P2PKHOutputSize * feeRate
@@ -3339,6 +3347,14 @@ func (dcr *ExchangeWallet) EstimateSendTxFee(sendAmount, feeRate uint64, subtrac
 			bal.Available, sendAmount+finalFee)
 	}
 	return finalFee, nil
+}
+
+func (dcr *ExchangeWallet) createSimpleTx(address stdaddr.Address, amount uint64) *wire.MsgTx {
+	baseTx := wire.NewMsgTx()
+	payScriptVer, payScript := address.PaymentScript()
+	txOut := newTxOut(int64(amount), payScriptVer, payScript)
+	baseTx.AddTxOut(txOut)
+	return baseTx
 }
 
 func (dcr *ExchangeWallet) broadcastTx(signedTx *wire.MsgTx) error {

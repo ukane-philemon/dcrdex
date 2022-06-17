@@ -52,6 +52,7 @@ type registrationTxFeeForm struct {
 }
 
 type sendTxFeeForm struct {
+	Address  string  `json:"address"`
 	Value    uint64  `json:"value"`
 	Subtract bool    `json:"subtract"`
 	AssetID  *uint32 `json:"assetID,omitempty"`

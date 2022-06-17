@@ -2554,6 +2554,7 @@ func TestEstimateSendTxFee(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	addr := tPKHAddr.String()
 	node.changeAddr = tPKHAddr
 	var unspentVal uint64 = 100e8
 	unspents := make([]walletjson.ListUnspentResult, 0)
@@ -2589,16 +2590,19 @@ func TestEstimateSendTxFee(t *testing.T) {
 		vout++
 	}
 
-	// bSize is the base size for a single tx input.
-	bSize := dexdcr.TxInOverhead + uint32(wire.VarIntSerializeSize(uint64(dexdcr.P2PKHSigScriptSize))) + dexdcr.P2PKHSigScriptSize
-	txSize := dexdcr.MsgTxOverhead + dexdcr.P2PKHOutputSize + bSize
-	estFee := uint64(txSize) * optimalFeeRate
-	changeFee := dexdcr.P2PKHOutputSize * optimalFeeRate
-	estFeeWithChange := changeFee + estFee
+	// inputSize is the base size for a single tx input.
+	inputSize := dexdcr.TxInOverhead + uint32(wire.VarIntSerializeSize(uint64(dexdcr.P2PKHSigScriptSize)))
+
+	estSendTxFee := func(addr stdaddr.Address, amt uint64, feeRate uint64) uint64 {
+		txSize := wallet.createSimpleTx(tPKHAddr, unspentVal).SerializeSize()
+		return uint64(txSize+int(inputSize)) * optimalFeeRate
+
+	}
 
 	// This should return fee estimate for one output.
 	addUtxo(unspentVal, 1, false)
-	estimate, err := wallet.EstimateSendTxFee(unspentVal, optimalFeeRate, true)
+	estFee := estSendTxFee(tPKHAddr, unspentVal, optimalFeeRate)
+	estimate, err := wallet.EstimateSendTxFee(addr, unspentVal, optimalFeeRate, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2606,8 +2610,22 @@ func TestEstimateSendTxFee(t *testing.T) {
 		t.Fatalf("expected estimate to be %v, got %v)", estFee, estimate)
 	}
 
+	dust := uint64(100)
+	addUtxo(dust, 0, true)
+	// This should return fee estimate for one output with dust added to fee.
+	estFeeWithDust := estFee + 100
+	estimate, err = wallet.EstimateSendTxFee(addr, unspentVal, optimalFeeRate, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if estimate != estFeeWithDust {
+		t.Fatalf("expected estimate to be %v, got %v)", estFeeWithDust, estimate)
+	}
+
 	// This should return fee estimate for two output.
-	estimate, err = wallet.EstimateSendTxFee(unspentVal/2, optimalFeeRate, true)
+	changeFee := dexdcr.P2PKHOutputSize * optimalFeeRate
+	estFeeWithChange := changeFee + estSendTxFee(tPKHAddr, unspentVal/2, optimalFeeRate)
+	estimate, err = wallet.EstimateSendTxFee(addr, unspentVal/2, optimalFeeRate, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2616,20 +2634,8 @@ func TestEstimateSendTxFee(t *testing.T) {
 	}
 
 	// This should return an error, not enough funds to cover fees.
-	_, err = wallet.EstimateSendTxFee(unspentVal, optimalFeeRate, false)
+	_, err = wallet.EstimateSendTxFee(addr, unspentVal, optimalFeeRate, false)
 	if err == nil {
 		t.Fatal("Expected error not enough to cover funds required")
-	}
-
-	dust := uint64(100)
-	addUtxo(dust, 0, true)
-	// This should return fee estimate for one output with dust added to fee.
-	estFeeWithDust := estFee + 100
-	estimate, err = wallet.EstimateSendTxFee(unspentVal, optimalFeeRate, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if estimate != estFeeWithDust {
-		t.Fatalf("expected estimate to be %v, got %v)", estFeeWithDust, estimate)
 	}
 }

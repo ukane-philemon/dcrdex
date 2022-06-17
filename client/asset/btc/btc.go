@@ -4148,7 +4148,12 @@ func (btc *baseWallet) createWitnessSig(tx *wire.MsgTx, idx int, pkScript []byte
 
 // EstimateSendTxFee returns a tx fee estimate for sending or withdrawing the
 // provided amount using the provided feeRate.
-func (btc *baseWallet) EstimateSendTxFee(sendAmount, feeRate uint64, subtract bool) (fee uint64, err error) {
+func (btc *baseWallet) EstimateSendTxFee(address string, sendAmount, feeRate uint64, subtract bool) (fee uint64, err error) {
+	addr, err := btc.decodeAddr(address, btc.chainParams)
+	if err != nil {
+		return 0, fmt.Errorf("address decode error: %w", err)
+	}
+
 	if sendAmount == 0 {
 		return 0, fmt.Errorf("cannot check fee: send amount = 0")
 	}
@@ -4159,7 +4164,10 @@ func (btc *baseWallet) EstimateSendTxFee(sendAmount, feeRate uint64, subtract bo
 		return 0, err
 	}
 
-	minTxSize := uint64(dexbtc.MinimumTxOverhead + btc.outputSize())
+	baseTx, err := btc.createSimpleTx(addr, sendAmount)
+	if err != nil {
+		return 0, err
+	}
 
 	// If subtract is true, select enough inputs for sendAmount. Fees will be taken
 	// from the sendAmount. If not, select enough inputs to cover minimum fees.
@@ -4167,20 +4175,26 @@ func (btc *baseWallet) EstimateSendTxFee(sendAmount, feeRate uint64, subtract bo
 		if subtract {
 			return sum >= sendAmount
 		}
-		minFee := (minTxSize + inputsSize) * feeRate
+		minFee := (uint64(baseTx.SerializeSize()) + inputsSize) * feeRate
 		return sum >= sendAmount+minFee
 	}
 	utxos, _, _, err := btc.spendableUTXOs(0)
 	if err != nil {
 		return 0, err
 	}
-	totalIn, vSize, _, _, _, _, err := fund(utxos, enough)
+	totalIn, _, _, fundingCoins, _, _, err := fund(utxos, enough)
 	if err != nil {
 		return 0, err
 	}
 
-	txSize := minTxSize + uint64(vSize)
-	estFee := feeRate * txSize
+	// Add inputs.
+	for op := range fundingCoins {
+		wireOP := wire.NewOutPoint(&op.txHash, op.vout)
+		txIn := wire.NewTxIn(wireOP, []byte{}, nil)
+		baseTx.AddTxIn(txIn)
+	}
+
+	estFee := uint64(baseTx.SerializeSize()) * feeRate
 	remaining := totalIn - sendAmount
 
 	// Check if there will be a change output if there is enough remaining.
@@ -4208,6 +4222,16 @@ func (btc *baseWallet) EstimateSendTxFee(sendAmount, feeRate uint64, subtract bo
 			bal.Available, sendAmount+finalFee)
 	}
 	return finalFee, nil
+}
+
+func (btc *baseWallet) createSimpleTx(address btcutil.Address, amount uint64) (baseTx *wire.MsgTx, err error) {
+	pkScript, err := txscript.PayToAddrScript(address)
+	if err != nil {
+		return nil, fmt.Errorf("error generating pubkey script: %w", err)
+	}
+	baseTx = wire.NewMsgTx(wire.TxVersion)
+	baseTx.AddTxOut(wire.NewTxOut(int64(amount), pkScript))
+	return baseTx, nil
 }
 
 // outputSize returns the size for a single output.

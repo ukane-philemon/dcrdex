@@ -118,7 +118,7 @@ type clientCore interface {
 	AccelerateOrder(pw []byte, oidB dex.Bytes, newFeeRate uint64) (string, error)
 	AccelerationEstimate(oidB dex.Bytes, newFeeRate uint64) (uint64, error)
 	UpdateCert(host string, cert []byte) error
-	EstimateSendTxFee(assetID uint32, value uint64, subtract bool) (fee uint64, err error)
+	EstimateSendTxFee(address string, assetID uint32, value uint64, subtract bool) (fee uint64, err error)
 }
 
 var _ clientCore = (*core.Core)(nil)

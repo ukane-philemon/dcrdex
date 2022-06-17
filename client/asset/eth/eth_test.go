@@ -3232,7 +3232,7 @@ func testEstimateSendTxFee(t *testing.T, assetID uint32) {
 			node.tokenContractor.bal = dexeth.GweiToWei(val - test.sendAdj)
 			node.bal = dexeth.GweiToWei(tokenFees - test.feeAdj)
 		}
-		estimate, err := w.EstimateSendTxFee(val, 0, false)
+		estimate, err := w.EstimateSendTxFee(testAddressA.String(), val, 0, false)
 		if test.wantErr {
 			if err == nil {
 				t.Fatalf("expected error for test %v", test.name)
