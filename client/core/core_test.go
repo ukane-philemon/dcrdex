@@ -111,6 +111,8 @@ var (
 	tRedemptionFeesPaid uint64 = 350
 	tLogger                    = dex.StdOutLogger("TCORE", dex.LevelDebug)
 	tMaxFeeRate         uint64 = 10
+	newBaseFeeRate      uint64 = 55
+	newQuoteFeeRate     uint64 = 65
 	tWalletInfo                = &asset.WalletInfo{
 		UnitInfo: dex.UnitInfo{
 			Conventional: dex.Denomination{
@@ -168,6 +170,16 @@ var (
 		msg.Unmarshal(redeem)
 		return redeem
 	})
+	feeRateSource = func(msg *msgjson.Message, f msgFunc) error {
+		var resp *msgjson.Message
+		if string(msg.Payload) == "42" {
+			resp, _ = msgjson.NewResponse(msg.ID, newBaseFeeRate, nil)
+		} else {
+			resp, _ = msgjson.NewResponse(msg.ID, newQuoteFeeRate, nil)
+		}
+		f(resp)
+		return nil
+	}
 )
 
 type TWebsocket struct {
@@ -2683,6 +2695,7 @@ func TestTrade(t *testing.T) {
 	}
 
 	// Initial success
+	rig.ws.queueResponse(msgjson.FeeRateRoute, feeRateSource)
 	rig.ws.queueResponse(msgjson.LimitRoute, handleLimit)
 	_, err = tCore.Trade(tPW, form)
 	if err != nil {
@@ -2848,6 +2861,7 @@ wait:
 
 	// Success when buying.
 	form.Sell = false
+	rig.ws.queueResponse(msgjson.FeeRateRoute, feeRateSource)
 	rig.ws.queueResponse(msgjson.LimitRoute, handleLimit)
 	_, err = tCore.Trade(tPW, form)
 	if err != nil {
@@ -2870,6 +2884,7 @@ wait:
 	// Successful market buy order
 	form.IsLimit = false
 	form.Qty = calc.BaseToQuote(rate, qty)
+	rig.ws.queueResponse(msgjson.FeeRateRoute, feeRateSource)
 	rig.ws.queueResponse(msgjson.MarketRoute, handleMarket)
 	_, err = tCore.Trade(tPW, form)
 	if err != nil {
@@ -2889,6 +2904,7 @@ wait:
 	// Successful market sell order.
 	form.Sell = true
 	form.Qty = qty
+	rig.ws.queueResponse(msgjson.FeeRateRoute, feeRateSource)
 	rig.ws.queueResponse(msgjson.MarketRoute, handleMarket)
 	_, err = tCore.Trade(tPW, form)
 	if err != nil {
@@ -2907,6 +2923,7 @@ wait:
 	const reserveN = 50
 	form.Base = tUTXOAssetB.ID
 	form.Quote = tACCTAsset.ID
+	rig.ws.queueResponse(msgjson.FeeRateRoute, feeRateSource)
 	rig.ws.queueResponse(msgjson.MarketRoute, handleMarket)
 	tEthWallet.reserveNRedemptions = reserveN
 	tEthWallet.sigs = []dex.Bytes{{}}
@@ -2934,6 +2951,7 @@ wait:
 	// Funds returned for later error.
 	tEthWallet.redemptionUnlocked = 0
 	rig.db.updateOrderErr = tErr
+	rig.ws.queueResponse(msgjson.FeeRateRoute, feeRateSource)
 	rig.ws.queueResponse(msgjson.MarketRoute, handleMarket)
 	ensureErr("db error after redeem funds checked out")
 	rig.db.updateOrderErr = nil
@@ -6533,6 +6551,7 @@ func TestHandleTradeResumptionMsg(t *testing.T) {
 		t.Fatalf("[handleTradeResumptionMsg] unexpected error: %v", err)
 	}
 
+	rig.ws.queueResponse(msgjson.FeeRateRoute, feeRateSource)
 	// Ensure trades for a resumed market are processed without error.
 	_, err = rig.core.Trade(tPW, tradeForm)
 	if err != nil {
@@ -7086,6 +7105,7 @@ func TestPreimageSync(t *testing.T) {
 
 	limitRouteProcessing := make(chan order.OrderID)
 
+	rig.ws.queueResponse(msgjson.FeeRateRoute, feeRateSource)
 	rig.ws.queueResponse(msgjson.LimitRoute, func(msg *msgjson.Message, f msgFunc) error {
 		t.Helper()
 		// Need to stamp and sign the message with the server's key.
@@ -7149,19 +7169,6 @@ func TestAccelerateOrder(t *testing.T) {
 
 	buyWalletSet, _ := tCore.walletSet(dc, tUTXOAssetA.ID, tUTXOAssetB.ID, false)
 	sellWalletSet, _ := tCore.walletSet(dc, tUTXOAssetA.ID, tUTXOAssetB.ID, false)
-
-	var newBaseFeeRate uint64 = 55
-	var newQuoteFeeRate uint64 = 65
-	feeRateSource := func(msg *msgjson.Message, f msgFunc) error {
-		var resp *msgjson.Message
-		if string(msg.Payload) == "42" {
-			resp, _ = msgjson.NewResponse(msg.ID, newBaseFeeRate, nil)
-		} else {
-			resp, _ = msgjson.NewResponse(msg.ID, newQuoteFeeRate, nil)
-		}
-		f(resp)
-		return nil
-	}
 
 	type testMatch struct {
 		status   order.MatchStatus
@@ -8548,19 +8555,6 @@ func TestPreOrder(t *testing.T) {
 	_, err = tCore.PreOrder(form)
 	if err != nil {
 		t.Fatalf("PreOrder limit sell error: %v", err)
-	}
-
-	var newBaseFeeRate uint64 = 55
-	var newQuoteFeeRate uint64 = 65
-	feeRateSource := func(msg *msgjson.Message, f msgFunc) error {
-		var resp *msgjson.Message
-		if string(msg.Payload) == "42" {
-			resp, _ = msgjson.NewResponse(msg.ID, newBaseFeeRate, nil)
-		} else {
-			resp, _ = msgjson.NewResponse(msg.ID, newQuoteFeeRate, nil)
-		}
-		f(resp)
-		return nil
 	}
 
 	// Removing the book should cause us to

@@ -4369,13 +4369,18 @@ func (c *Core) prepareTrackedTrade(dc *dexConnection, form *TradeForm, crypter e
 			qty, wallets.baseAsset.Symbol, rate, lotSize)
 	}
 
+	swapFeeSuggestion := c.feeSuggestion(dc, wallets.fromAsset.ID)
+	if swapFeeSuggestion == 0 {
+		return nil, 0, fmt.Errorf("failed to get swap fee suggestion for %s at %s", unbip(wallets.fromAsset.ID), form.Host)
+	}
+
 	coins, redeemScripts, err := fromWallet.FundOrder(&asset.Order{
 		Value:         fundQty,
 		MaxSwapCount:  lots,
 		DEXConfig:     wallets.fromAsset,
 		RedeemConfig:  wallets.toAsset,
 		Immediate:     isImmediate,
-		FeeSuggestion: c.feeSuggestion(dc, wallets.fromAsset.ID),
+		FeeSuggestion: swapFeeSuggestion,
 		Options:       form.Options,
 	})
 	if err != nil {
