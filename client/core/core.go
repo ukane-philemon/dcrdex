@@ -3608,8 +3608,33 @@ func (c *Core) Orders(filter *OrderFilter) ([]*Order, error) {
 // coreOrderFromMetaOrder creates an *Order from a *db.MetaOrder, including
 // loading matches from the database. The order is presumed to be inactive, so
 // swap coin confirmations will not be set. For active orders, get the
-// *trackedTrade and use the coreOrder method.
+// *trackedTrade and use the coreOrder method. If the order has a cancel order
+// associated with it, the cancel order will be returned,
 func (c *Core) coreOrderFromMetaOrder(mOrd *db.MetaOrder) (*Order, error) {
+	if !mOrd.MetaData.LinkedOrder.IsZero() {
+		cancelID := mOrd.MetaData.LinkedOrder
+		metaCancel, err := c.db.Order(cancelID)
+		if err != nil {
+			return nil, fmt.Errorf("cancel order %s not found for trade %s", cancelID, mOrd.Order.ID())
+
+		}
+		co, ok := metaCancel.Order.(*order.CancelOrder)
+		if !ok || co == nil {
+			return nil, fmt.Errorf("linked order %s is not a cancel order", cancelID)
+		}
+		corder := coreOrderFromTrade(co, mOrd.MetaData)
+		trade := mOrd.Order.Trade()
+		corder.Qty = trade.Quantity
+		corder.Sell = trade.Sell
+		ot := mOrd.Order.(*order.LimitOrder)
+		if ot != nil {
+			corder.ID = ot.ID().Bytes() // change cancel order ID for use in retrieving original order.
+			corder.Rate = ot.Rate
+			corder.TimeInForce = ot.Force
+		}
+		return corder, nil
+	}
+
 	corder := coreOrderFromTrade(mOrd.Order, mOrd.MetaData)
 	oid := mOrd.Order.ID()
 	excludeCancels := false // maybe don't include cancel order matches?

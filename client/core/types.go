@@ -344,6 +344,7 @@ func coreOrderFromTrade(ord order.Order, metaData *db.OrderMetaData) *Order {
 			Status:        metaData.Status,
 			FeesPaid:      new(FeeBreakdown),
 			TargetOrderID: ot.TargetOrderID.Bytes(),
+			Canceled:      true,
 		}
 	}
 
