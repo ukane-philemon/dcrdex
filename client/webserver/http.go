@@ -394,21 +394,21 @@ func (s *WebServer) handleExportOrders(w http.ResponseWriter, r *http.Request) {
 
 		timestamp := time.UnixMilli(int64(ord.Stamp)).Local().Format(time.RFC3339Nano)
 		err = csvWriter.Write([]string{
-			ord.Host,                      // Host
-			ord.BaseSymbol,                // Base
-			ord.QuoteSymbol,               // Quote
-			ordReader.BaseQtyString(),     // Base Quantity
-			ordReader.SimpleRateString(),  // Order Rate
-			ordReader.AverageRateString(), // Actual Rate
-			ordReader.BaseAssetFees(),     // Base Fees
-			ordReader.QuoteAssetFees(),    // Quote Fees
-			ordReader.Type.String(),       // Type
-			ordReader.SideString(),        // Side
-			ord.TimeInForce.String(),      // Time in Force
-			ordReader.StatusString(),      // Status
-			ordReader.FilledPercent(),     // Filled
-			ordReader.SettledPercent(),    // Settled
-			timestamp,                     // Time
+			ord.Host,                       // Host
+			ord.BaseSymbol,                 // Base
+			ord.QuoteSymbol,                // Quote
+			ordReader.BaseQtyString(),      // Base Quantity
+			ordReader.SimpleRateString(),   // Order Rate
+			ordReader.AverageRateString(),  // Actual Rate
+			ordReader.BaseAssetFees(),      // Base Fees
+			ordReader.QuoteAssetFees(),     // Quote Fees
+			ordReader.Type.String(),        // Type
+			ordReader.SideString(),         // Side
+			ord.TimeInForce.String(),       // Time in Force
+			ordReader.StatusString(),       // Status
+			ordReader.FilledPercent(false), // Filled
+			ordReader.SettledPercent(),     // Settled
+			timestamp,                      // Time
 		})
 		if err != nil {
 			log.Errorf("error writing CSV: %v", err)

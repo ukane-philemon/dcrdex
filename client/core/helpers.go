@@ -141,28 +141,40 @@ func (ord *OrderReader) SettledPercent() string {
 }
 
 // FilledFrom is the sum filled in units of the outgoing asset.
-func (ord *OrderReader) FilledFrom() string {
-	if ord.Sell {
-		return formatQty(ord.sumFrom(filledFilter), ord.BaseUnitInfo)
+func (ord *OrderReader) FilledFrom(excludeCancels bool) string {
+	filter := filledFilter
+	if excludeCancels {
+		filter = filledNonCancelFilter
 	}
-	return formatQty(ord.sumFrom(filledFilter), ord.QuoteUnitInfo)
+	if ord.Sell {
+		return formatQty(ord.sumFrom(filter), ord.BaseUnitInfo)
+	}
+	return formatQty(ord.sumFrom(filter), ord.QuoteUnitInfo)
 }
 
 // FilledTo is the sum filled in units of the incoming asset.
-func (ord *OrderReader) FilledTo() string {
-	if ord.Sell {
-		return formatQty(ord.sumTo(filledFilter), ord.QuoteUnitInfo)
+func (ord *OrderReader) FilledTo(excludeCancels bool) string {
+	filter := filledFilter
+	if excludeCancels {
+		filter = filledNonCancelFilter
 	}
-	return formatQty(ord.sumTo(filledFilter), ord.BaseUnitInfo)
+	if ord.Sell {
+		return formatQty(ord.sumTo(filter), ord.QuoteUnitInfo)
+	}
+	return formatQty(ord.sumTo(filter), ord.BaseUnitInfo)
 }
 
 // FilledPercent is the percent of the order that has filled, without percent
 // sign.
-func (ord *OrderReader) FilledPercent() string {
+func (ord *OrderReader) FilledPercent(excludeCancels bool) string {
+	filter := filledFilter
+	if excludeCancels {
+		filter = filledNonCancelFilter
+	}
 	if ord.Type == order.CancelOrderType {
 		return ""
 	}
-	return ord.percent(filledFilter)
+	return ord.percent(filter)
 }
 
 // SideString is "sell" for sell orders, "buy" for buy orders, and "" for

@@ -57,10 +57,10 @@
       <div class="order-datum">
         <div>已满</div>
         <div>
-          {{$ord.FilledPercent}}%
-          ({{$ord.FilledFrom}} {{template "microIcon" $ord.FromSymbol}}
+          {{$ord.FilledPercent true}}%
+          ({{$ord.FilledFrom true}} {{template "microIcon" $ord.FromSymbol}}
           &rarr;
-          {{$ord.FilledTo}} {{template "microIcon" $ord.ToSymbol}})
+          {{$ord.FilledTo true}} {{template "microIcon" $ord.ToSymbol}})
         </div>
       </div>
       <div class="order-datum">

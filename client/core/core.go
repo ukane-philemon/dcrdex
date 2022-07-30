@@ -7406,23 +7406,23 @@ func (c *Core) deleteOrderFn(ordersFileStr string) (perOrderFn func(*db.MetaOrde
 
 		timestamp := time.UnixMilli(int64(cord.Stamp)).Local().Format(time.RFC3339Nano)
 		err = csvWriter.Write([]string{
-			cord.Host,                     // Host
-			ord.Order.ID().String(),       // Order ID
-			cord.BaseSymbol,               // Base
-			cord.QuoteSymbol,              // Quote
-			ordReader.BaseQtyString(),     // Base Quantity
-			ordReader.SimpleRateString(),  // Order Rate
-			ordReader.AverageRateString(), // Actual Rate
-			ordReader.BaseAssetFees(),     // Base Fees
-			ordReader.QuoteAssetFees(),    // Quote Fees
-			ordReader.Type.String(),       // Type
-			ordReader.SideString(),        // Side
-			cord.TimeInForce.String(),     // Time in Force
-			ordReader.StatusString(),      // Status
-			cord.TargetOrderID.String(),   // Target Order ID
-			ordReader.FilledPercent(),     // Filled
-			ordReader.SettledPercent(),    // Settled
-			timestamp,                     // Time
+			cord.Host,                      // Host
+			ord.Order.ID().String(),        // Order ID
+			cord.BaseSymbol,                // Base
+			cord.QuoteSymbol,               // Quote
+			ordReader.BaseQtyString(),      // Base Quantity
+			ordReader.SimpleRateString(),   // Order Rate
+			ordReader.AverageRateString(),  // Actual Rate
+			ordReader.BaseAssetFees(),      // Base Fees
+			ordReader.QuoteAssetFees(),     // Quote Fees
+			ordReader.Type.String(),        // Type
+			ordReader.SideString(),         // Side
+			cord.TimeInForce.String(),      // Time in Force
+			ordReader.StatusString(),       // Status
+			cord.TargetOrderID.String(),    // Target Order ID
+			ordReader.FilledPercent(false), // Filled
+			ordReader.SettledPercent(),     // Settled
+			timestamp,                      // Time
 		})
 		if err != nil {
 			return fmt.Errorf("error writing orders CSV: %v", err)
