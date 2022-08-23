@@ -111,8 +111,9 @@ export default class Doc {
    */
   static mouseInElement (e: MouseEvent, el: HTMLElement): boolean {
     const rect = el.getBoundingClientRect()
-    return e.pageX >= rect.left && e.pageX <= rect.right &&
-      e.pageY >= rect.top && e.pageY <= rect.bottom
+    return (e.pageX >= rect.left && e.pageX <= rect.right &&
+      e.pageY >= rect.top && e.pageY <= rect.bottom) ||
+      (e.pageX === 0 && e.pageY === 0)
   }
 
   /*
