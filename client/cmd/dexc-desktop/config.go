@@ -1,0 +1,41 @@
+// This code is available on the terms of the project LICENSE.md file,
+// also available online at https://blueoakcouncil.org/license/1.0.0.
+
+package main
+
+import (
+	"decred.org/dcrdex/client/app"
+)
+
+// Config is the configuration for the DEX client application.
+type Config struct {
+	app.Config
+	Kill      bool `long:"kill" description:"Send a kill signal to a running instance and exit"`
+	LogStdout bool `long:"stdout" description:"Log to stdout (in addition to the log file)"`
+}
+
+func configure() (*Config, error) {
+	// Pre-parse the command line options for one of a few CLI-only settings;
+	// --appdata, --config, --help, or --version.
+	cliCfg := Config{
+		Config: app.DefaultConfig,
+	}
+	if err := app.ParseCLIConfig(&cliCfg); err != nil {
+		return nil, err
+	}
+	appData, configPath := app.ResolveCLIConfigPaths(&cliCfg.Config)
+
+	// The full config.
+	cfg := Config{
+		Config: app.DefaultConfig,
+	}
+
+	// Load additional config from file. CLI settings are reparsed to override
+	// any settings parsed from file.
+	if err := app.ParseFileConfig(configPath, &cfg); err != nil {
+		return nil, err
+	}
+
+	// Resolve unset fields.
+	return &cfg, app.ResolveConfig(appData, &cfg.Config)
+}
