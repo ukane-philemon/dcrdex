@@ -10,8 +10,9 @@ import (
 // Config is the configuration for the DEX client application.
 type Config struct {
 	app.Config
-	Kill      bool `long:"kill" description:"Send a kill signal to a running instance and exit"`
-	LogStdout bool `long:"stdout" description:"Log to stdout (in addition to the log file)"`
+	Kill      bool   `long:"kill" description:"Send a kill signal to a running instance and exit"`
+	LogStdout bool   `long:"stdout" description:"Log to stdout (in addition to the log file)"`
+	Webview   string `long:"webview" description:"Opens a webview window pointing to the provided URL. Does nothing else. Precludes applicability of any other settings."`
 }
 
 func configure() (*Config, error) {

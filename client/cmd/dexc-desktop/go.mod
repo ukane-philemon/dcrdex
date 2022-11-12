@@ -5,11 +5,7 @@ go 1.17
 replace decred.org/dcrdex => ../../..
 
 require (
-	decred.org/dcrdex v0.4.0
-	github.com/decred/dcrd/dcrutil/v4 v4.0.0
-	github.com/decred/slog v1.2.0
-	github.com/jessevdk/go-flags v1.5.0
-	github.com/jrick/logrotate v1.0.0
+	decred.org/dcrdex v0.5.5
 	github.com/webview/webview v0.0.0-20210330151455-f540d88dde4e
 )
 
@@ -62,6 +58,7 @@ require (
 	github.com/decred/dcrd/dcrec/edwards/v2 v2.0.2 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/decred/dcrd/dcrjson/v4 v4.0.0 // indirect
+	github.com/decred/dcrd/dcrutil/v4 v4.0.0 // indirect
 	github.com/decred/dcrd/gcs/v3 v3.0.0 // indirect
 	github.com/decred/dcrd/hdkeychain/v3 v3.1.0 // indirect
 	github.com/decred/dcrd/lru v1.1.1 // indirect
@@ -70,6 +67,7 @@ require (
 	github.com/decred/dcrd/txscript/v4 v4.0.0 // indirect
 	github.com/decred/dcrd/wire v1.5.0 // indirect
 	github.com/decred/go-socks v1.1.0 // indirect
+	github.com/decred/slog v1.2.0 // indirect
 	github.com/dgraph-io/badger v1.6.2 // indirect
 	github.com/dgraph-io/ristretto v0.0.2 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
@@ -97,7 +95,9 @@ require (
 	github.com/holiman/uint256 v1.2.0 // indirect
 	github.com/huin/goupnp v1.0.3 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
+	github.com/jessevdk/go-flags v1.5.0 // indirect
 	github.com/jrick/bitset v1.0.0 // indirect
+	github.com/jrick/logrotate v1.0.0 // indirect
 	github.com/jrick/wsrpc/v2 v2.3.4 // indirect
 	github.com/kkdai/bstream v1.0.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect

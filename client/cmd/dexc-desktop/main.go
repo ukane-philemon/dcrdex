@@ -63,12 +63,58 @@ page when jumping between views.
 
 package main
 
+// Full screen cgo solution. Seems to work on Debian.
+// TODO: Check multi-screen.
+// https://github.com/webview/webview/issues/458#issuecomment-738034846
+
+/*
+#cgo darwin LDFLAGS: -framework CoreGraphics
+#cgo linux pkg-config: x11
+#if defined(__APPLE__)
+#include <CoreGraphics/CGDisplayConfiguration.h>
+int display_width() {
+	return CGDisplayPixelsWide(CGMainDisplayID());
+}
+int display_height() {
+	return CGDisplayPixelsHigh(CGMainDisplayID());
+}
+#elif defined(_WIN32)
+#include <wtypes.h>
+int display_width() {
+	RECT desktop;
+	const HWND hDesktop = GetDesktopWindow();
+	GetWindowRect(hDesktop, &desktop);
+	return desktop.right;
+}
+int display_height() {
+	RECT desktop;
+	const HWND hDesktop = GetDesktopWindow();
+	GetWindowRect(hDesktop, &desktop);
+	return desktop.bottom;
+}
+#else
+#include <X11/Xlib.h>
+int display_width() {
+	Display* d = XOpenDisplay(NULL);
+	Screen*  s = DefaultScreenOfDisplay(d);
+	return s->width;
+}
+int display_height() {
+	Display* d = XOpenDisplay(NULL);
+	Screen*  s = DefaultScreenOfDisplay(d);
+	return s->height;
+}
+#endif
+*/
+import "C"
 import (
 	"context"
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"runtime/pprof"
@@ -88,7 +134,6 @@ import (
 	"decred.org/dcrdex/client/rpcserver"
 	"decred.org/dcrdex/client/webserver"
 	"decred.org/dcrdex/dex"
-
 	"github.com/webview/webview"
 )
 
@@ -116,6 +161,17 @@ func mainCore() error {
 		return fmt.Errorf("configration error: %w", err)
 	}
 
+	// A single process cannot run multiple webview windows, so we run webview
+	// as a subprocess. We could create a simpler webview binary to call that
+	// would be substantially smaller than the dexc binary, but when done that
+	// way, the opened window does not have the icon that the system associates
+	// with dexc and taskbar icons won't be stacked. Instead, we'll create a
+	// short path here and execute ourself with the --webview flag.
+	if cfg.Webview != "" {
+		runWebview(cfg.Webview)
+		return nil
+	}
+
 	// Initialize logging.
 	utc := !cfg.LocalLogs
 	if cfg.Net == dex.Simnet {
@@ -130,6 +186,8 @@ func mainCore() error {
 			time.Now().Local().Format("15:04:05 MST"))
 	}
 
+	// The --kill flag is a backup measure to end a background process (that
+	// presumably has active orders).
 	if cfg.Kill {
 		sendKillSignal(cfg.AppData)
 		return nil
@@ -246,58 +304,142 @@ func mainCore() error {
 		}()
 	}
 
-	// var w webview.WebView
-	runWebview := func() {
-		w := webview.New(true)
-		defer w.Destroy()
-		w.SetTitle("DCRDEX")
-		w.SetSize(1280, 1024, webview.HintNone)
-		w.Navigate("http://" + webSrv.Addr())
-		w.Run()
+	openWindow := func() {
+		wg.Add(1)
+		go func() {
+			runWebviewSubprocess(appCtx, "http://"+webSrv.Addr())
+			wg.Done()
+		}()
 	}
+
+	openWindow()
+
 windowloop:
 	for {
-		runWebview()
-		// All closes are forced closes now.
-		if appCtx.Err() != nil {
-			break
-		}
-
-		// The window is closed, but make sure we can log out. We'll run in the
-		// background until we can log out or until the user attempts to re-open
-		// the program, in which case we'll receive the request from the
-		// sync server via openC.
-	logout:
-		for {
-			err := clientCore.Logout()
-			if err == nil {
-				// Okay to quit.
-				break windowloop
+		select {
+		case <-windowManager.zeroLeft:
+		logout:
+			for {
+				err := clientCore.Logout()
+				if err == nil {
+					// Okay to quit.
+					break windowloop
+				}
+				if !errors.Is(err, core.ActiveOrdersLogoutErr) {
+					// Unknown error. Force shutdown.
+					log.Errorf("Core logout error: %v", err)
+					break windowloop
+				}
+				// Can't log out. Keep checking until either
+				//   1. We can log out. Exit the program.
+				//   2. The user reopens the window (via syncserver).
+				select {
+				case <-time.After(time.Minute):
+					// Try to log out again.
+					continue logout
+				case <-openC:
+					// re-open the window
+					openWindow()
+					continue windowloop
+				case <-appCtx.Done():
+					break windowloop
+				}
 			}
-			if !errors.Is(err, core.ActiveOrdersLogoutErr) {
-				// Unknown error. Force shutdown.
-				log.Errorf("Core logout error: %v", err)
-				break windowloop
-			}
-			// Can't log out. Keep checking until either
-			//   1. We can log out. Exit the program.
-			//   2. The user reopens the window (via syncserver).
-			select {
-			case <-time.After(time.Minute):
-				// Try to log out again.
-				continue logout
-			case <-openC:
-				// re-open the window
-				continue windowloop
-			case <-appCtx.Done():
-				break windowloop
-			}
+		case <-appCtx.Done():
+			break windowloop
+		case <-openC:
+			openWindow()
 		}
 	}
+
+	closeAllWindows()
 
 	log.Infof("Shutting down...")
 	cancel()
 	wg.Wait()
 
 	return nil
+}
+
+var windowManager = &struct {
+	sync.Mutex
+	counter  uint32
+	windows  map[uint32]*exec.Cmd
+	zeroLeft chan struct{}
+}{
+	windows:  make(map[uint32]*exec.Cmd),
+	zeroLeft: make(chan struct{}, 1),
+}
+
+func closeWindow(windowID uint32) {
+	m := windowManager
+	m.Lock()
+	cmd, found := m.windows[windowID]
+	if !found {
+		m.Unlock()
+		// Probably killed by caller.
+		return
+	}
+	delete(m.windows, windowID)
+	remain := len(m.windows)
+	m.Unlock()
+	if remain == 0 {
+		select {
+		case m.zeroLeft <- struct{}{}:
+		default:
+		}
+	}
+	cmd.Process.Kill()
+}
+
+func closeAllWindows() {
+	m := windowManager
+	m.Lock()
+	defer m.Unlock()
+	for windowID, cmd := range m.windows {
+		cmd.Process.Kill()
+		delete(m.windows, windowID)
+	}
+}
+
+func runWebview(url string) {
+	w := webview.New(true)
+	defer w.Destroy()
+	w.SetTitle("Decred DEX Client")
+	w.SetSize(int(C.display_width()), int(C.display_height()), webview.HintNone)
+	w.Navigate(url)
+	w.Run()
+}
+
+func runWebviewSubprocess(ctx context.Context, url string) {
+	cmd := exec.CommandContext(ctx, exePath, "--webview", url)
+	m := windowManager
+
+	m.Lock()
+	m.counter++
+	windowID := windowManager.counter
+	m.windows[windowID] = cmd
+	m.Unlock()
+	defer closeWindow(windowID)
+
+	cmd.Run()
+}
+
+// Set in init.
+var exePath string
+
+func findExePath() (string, error) {
+	rawPath, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	return filepath.EvalSymlinks(rawPath)
+}
+
+func init() {
+	var err error
+	exePath, err = findExePath()
+	if err != nil {
+		panic("error finding webview: " + err.Error())
+	}
 }
