@@ -8,8 +8,8 @@ differences that make this version more suitable for less tech-savvy users.
 | CLI version                       | Desktop version                          |
 |-----------------------------------|------------------------------------------|
 | Installed by building from source | Installed with an installer program.     |
-| or downloading a binary.          | Debian archive for Debian Linux,         |
-|                                   | Inno Setup for Windows.                  |
+| or downloading a binary. Or with  | Debian archive for Debian Linux,         |
+| dcrinstall from a terminal.       | .exe (e.g. Inno Setup) for Windows.      |
 |-----------------------------------|------------------------------------------|
 | Started by command-line.          | Started by selecting from the start/main |
 |                                   | menu, or by selecting a desktop icon or  |
@@ -53,12 +53,6 @@ but the UX would be unaffected, other than always being synced. This would
 expand our options for solving the problem of securing refunds through reboots.
 For UTXO based assets, we can send refund txs without user login. For EVM, we
 likely can't, because the nonce is probably no good.
-
-One limitation of WebView is that we can only open one window at a time, and
-there are no tabs. https://github.com/webview/webview/issues/647. The user can
-still access additional views through their browser, if necessary, but we
-cache data effectively such that its not a big deal to e.g. reload the markets
-page when jumping between views.
 */
 
 package main
@@ -139,7 +133,10 @@ import (
 
 const appName = "dexc"
 
-var log dex.Logger
+var (
+	log     dex.Logger
+	exePath = findExePath()
+)
 
 func main() {
 	// Wrap the actual main so defers run in it.
@@ -377,7 +374,7 @@ func closeWindow(windowID uint32) {
 	cmd, found := m.windows[windowID]
 	if !found {
 		m.Unlock()
-		// Probably killed by caller.
+		// Probably killed by caller via closeAllWindows.
 		return
 	}
 	delete(m.windows, windowID)
@@ -425,21 +422,14 @@ func runWebviewSubprocess(ctx context.Context, url string) {
 	cmd.Run()
 }
 
-// Set in init.
-var exePath string
-
-func findExePath() (string, error) {
+func findExePath() string {
 	rawPath, err := os.Executable()
 	if err != nil {
-		return "", err
+		panic("error finding executable: " + err.Error())
 	}
-	return filepath.EvalSymlinks(rawPath)
-}
-
-func init() {
-	var err error
-	exePath, err = findExePath()
+	s, err := filepath.EvalSymlinks(rawPath)
 	if err != nil {
-		panic("error finding webview: " + err.Error())
+		panic("error resolving symlinks:" + err.Error())
 	}
+	return s
 }
