@@ -24,16 +24,17 @@ differences that make this version more suitable for less tech-savvy users.
 | there are active orders.          | active orders. Run a little server that  |
 |                                   | synchronizes at start-up, enabling the   |
 |                                   | window to be reopened when the user      |
-|                                   | tries to start another instance.         |
+|                                   | tries to start another instance. A       |
+|                                   | desktop notification is sent and the     |
+|                                   | system tray icon remains in the tray.    |
 |-----------------------------------|------------------------------------------|
 
 Both versions use the same default client configuration file locations at
 AppDataDir("dexc").
 
 Since the program continues running in the background if there are active
-orders, there becomes a question of how and when to shutdown, or what
-happens when the user simply shuts off their computer, or it automatically restarts
-after updating.
+orders, there becomes a question of how and when to shutdown, or what happens
+when the user simply shuts off their computer.
  1) If there are no active orders when the user closes the window, dexc will
     exit immediately.
  2) If we receive a SIGTERM signal, expected for system shutdown, shut down
@@ -42,17 +43,6 @@ after updating.
     We check every minute while the window is closed.
  4) The user can kill the background program with a command-line argument,
     --kill, which uses the sync server in the background to issue the command.
-
-DRAFT NOTES:
-
-Should we show a system-tray icon when running in the background?
-
-I (Buck) think we should offer a way for the user to run dexc as a system
-service (under the user, runs at login). The service would start with no window,
-but the UX would be unaffected, other than always being synced. This would
-expand our options for solving the problem of securing refunds through reboots.
-For UTXO based assets, we can send refund txs without user login. For EVM, we
-likely can't, because the nonce is probably no good.
 */
 
 package main
@@ -103,6 +93,7 @@ int display_height() {
 import "C"
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"fmt"
 	"os"
@@ -129,6 +120,9 @@ import (
 	"decred.org/dcrdex/client/webserver"
 	"decred.org/dcrdex/dex"
 	"github.com/webview/webview"
+
+	"fyne.io/systray"
+	"github.com/gen2brain/beeep"
 )
 
 const appName = "dexc"
@@ -136,6 +130,7 @@ const appName = "dexc"
 var (
 	log     dex.Logger
 	exePath = findExePath()
+	srcDir  = filepath.Join(filepath.Dir(exePath), "src")
 )
 
 func main() {
@@ -301,6 +296,16 @@ func mainCore() error {
 		}()
 	}
 
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		systray.Run(func() {
+			systrayOnReady(appCtx, filepath.Dir(cfg.LogPath), openC, killChan)
+		}, func() {
+			wg.Done()
+		})
+	}()
+
 	openWindow := func() {
 		wg.Add(1)
 		go func() {
@@ -313,6 +318,7 @@ func mainCore() error {
 
 windowloop:
 	for {
+		var backgroundNoteSent bool
 		select {
 		case <-windowManager.zeroLeft:
 		logout:
@@ -326,6 +332,10 @@ windowloop:
 					// Unknown error. Force shutdown.
 					log.Errorf("Core logout error: %v", err)
 					break windowloop
+				}
+				if !backgroundNoteSent {
+					sendDesktopNotification("DEX client still running", "DEX client is still resolving active DEX orders")
+					backgroundNoteSent = true
 				}
 				// Can't log out. Keep checking until either
 				//   1. We can log out. Exit the program.
@@ -432,4 +442,113 @@ func findExePath() string {
 		panic("error resolving symlinks:" + err.Error())
 	}
 	return s
+}
+
+//go:embed src/dexc.png
+var FavIcon []byte
+
+//go:embed src/symbol-bw-round.png
+var SymbolBWIcon []byte
+
+func systrayOnReady(ctx context.Context, logDirectory string, openC chan<- struct{}, killC chan<- os.Signal) {
+	go func() {
+		<-ctx.Done()
+		systray.SetTooltip("Shutting down. Please wait...")
+		systray.Quit()
+	}()
+
+	systray.SetIcon(FavIcon)
+	systray.SetTitle("DEX client")
+	systray.SetTooltip("Self-custodial multi-wallet")
+
+	// TODO: Consider reworking main so we can show the icon earlier?
+	// mStarting := systray.AddMenuItem("Starting...", "Starting up. Please wait...")
+	// var addr string
+	// var ok bool
+	// select {
+	// case addr, ok = <-webserverReady:
+	// 	if !ok { // no webserver started
+	// 		fmt.Fprintln(os.Stderr, "Web server required!")
+	// 		cancel()
+	// 		return
+	// 	}
+	// case <-mainDone:
+	// 	return
+	// }
+
+	// mStarting.Hide()
+
+	mOpen := systray.AddMenuItem("Open", "Open DEX client window")
+	mOpen.SetIcon(SymbolBWIcon)
+	go func() {
+		for range mOpen.ClickedCh {
+			select {
+			case openC <- struct{}{}:
+				log.Info("Window opened")
+			default:
+				log.Infof("Ignored a window open request from the system tray")
+			}
+		}
+	}()
+
+	systray.AddSeparator()
+
+	if logDirURL, err := filePathToURL(logDirectory); err != nil {
+		log.Errorf("error constructing log directory URL: %v", err)
+	} else {
+		mLogs := systray.AddMenuItem("Open logs folder", "Open the folder with your DEX logs.")
+		go func() {
+			for range mLogs.ClickedCh {
+				runWebviewSubprocess(ctx, logDirURL)
+			}
+		}()
+	}
+
+	// TODO: Allow editing of configuration? What happens when they screw it up
+	// and make startup impossible?
+	// if cfgPathURL, err := filePathToURL(cfgPath); err != nil {
+	// 	fmt.Fprintln(os.Stderr, err)
+	// } else {
+	// 	mConfigFile := systray.AddMenuItem("Edit config file", "Open the config file in a text editor.")
+	// 	go func() {
+	// 		for range mConfigFile.ClickedCh {
+	// 			if _, err := os.Stat(cfgPath); err != nil {
+	// 				if os.IsNotExist(err) {
+	// 					fid, err := os.Create(cfgPath)
+	// 					if err != nil {
+	// 						fmt.Fprintf(os.Stderr, "failed to create new config file: %v", err)
+	// 						continue
+	// 					}
+	// 					fid.Close()
+	// 				}
+	// 			}
+	// 			err := browser.OpenURL(cfgPathURL)
+	// 			if err != nil {
+	// 				fmt.Fprintln(os.Stderr, err)
+	// 			}
+	// 		}
+	// 	}()
+	// }
+
+	// TODO: Enable toggling automatic startup on boot. This would be part of a
+	// larger effort aimed at securing refunds through system restarts.
+	// https://github.com/decred/dcrdex/pull/1957#discussion_r1020780014
+
+	systray.AddSeparator()
+
+	mQuit := systray.AddMenuItem("Force Quit", "Force DEX client to close.")
+	go func() {
+		<-mQuit.ClickedCh
+		mOpen.Disable()
+		mQuit.Disable()
+		killC <- os.Interrupt
+	}()
+}
+
+func sendDesktopNotification(title, msg string) {
+	err := beeep.Notify(title, msg, filepath.Join(srcDir, "dexc.png"))
+	if err != nil {
+		log.Errorf("error sending desktop notification: %v", err)
+		return
+	}
 }
