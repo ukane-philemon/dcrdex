@@ -399,6 +399,24 @@ func (dc *dexConnection) getPendingFee() *PendingFeeState {
 	}
 }
 
+// pendingBonds returns the PendingBondState for all pending bonds.
+func (dc *dexConnection) pendingBonds() map[string]*PendingBondState {
+	dc.acct.authMtx.RLock()
+	defer dc.acct.authMtx.RUnlock()
+
+	pendingBonds := make(map[string]*PendingBondState, len(dc.acct.pendingBonds))
+	for _, pb := range dc.acct.pendingBonds {
+		bondIDStr := coinIDString(pb.AssetID, pb.CoinID)
+		confs := dc.acct.pendingBondsConfs[bondIDStr]
+		pendingBonds[bondIDStr] = &PendingBondState{
+			AssetID: pb.AssetID,
+			Symbol:  unbip(pb.AssetID),
+			Confs:   confs,
+		}
+	}
+	return pendingBonds
+}
+
 func (dc *dexConnection) exchangeInfo() *Exchange {
 	// Set AcctID to empty string if not registered.
 	acctID := dc.acct.ID().String()
@@ -415,6 +433,7 @@ func (dc *dexConnection) exchangeInfo() *Exchange {
 			Host:             dc.acct.host,
 			AcctID:           acctID,
 			ConnectionStatus: dc.status(),
+			PendingBonds:     dc.pendingBonds(),
 			PendingFee:       dc.getPendingFee(), // V0PURGE - deprecated with bonds in v1
 		}
 	}
@@ -457,7 +476,6 @@ func (dc *dexConnection) exchangeInfo() *Exchange {
 
 	dc.acct.authMtx.RLock()
 	// TODO: List bonds in core.Exchange. For now, just tier.
-	bondsPending := len(dc.acct.pendingBonds) > 0
 	tier := dc.acct.tier
 	dc.acct.authMtx.RUnlock()
 
@@ -472,7 +490,7 @@ func (dc *dexConnection) exchangeInfo() *Exchange {
 		CandleDurs:       cfg.BinSizes,
 		ViewOnly:         dc.acct.isViewOnly(),
 		Tier:             tier,
-		BondsPending:     bondsPending,
+		PendingBonds:     dc.pendingBonds(),
 		// TODO: Bonds
 
 		// Legacy reg fee (V0PURGE)
@@ -2695,7 +2713,7 @@ func (c *Core) assetHasActiveOrders(assetID uint32) bool {
 }
 
 // walletIsActive combines assetHasActiveOrders with a check for pending
-// registration fee payments.
+// registration fee payments and pending bonds.
 func (c *Core) walletIsActive(assetID uint32) bool {
 	if c.assetHasActiveOrders(assetID) {
 		return true
@@ -2703,6 +2721,11 @@ func (c *Core) walletIsActive(assetID uint32) bool {
 	for _, dc := range c.dexConnections() {
 		if pf := dc.getPendingFee(); pf != nil && pf.AssetID == assetID {
 			return true
+		}
+		for _, pb := range dc.pendingBonds() {
+			if pb.AssetID == assetID {
+				return true
+			}
 		}
 	}
 	return false
