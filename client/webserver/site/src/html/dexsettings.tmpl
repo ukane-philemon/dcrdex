@@ -18,6 +18,9 @@
       <button id="disableAcctBtn" class="bg2 selected">[[[Disable Account]]]</button>
     </div>
     <div>
+      <button id="postBondBtn" class="bg2 selected">[[[Post Bond]]]</button>
+    </div>
+    <div>
       <input type="file" class="form-control select d-none" id="certFileInput">
       <button id="updateCertBtn" class="bg2 selected">[[[Update TLS Certificate]]]</button>
       <span class="update-cert-msg mx-2 d-hide" id="updateCertMsg">[[[successful_cert_update]]]</span>
@@ -42,6 +45,30 @@
     <form class="d-hide" id="dexAddrForm" autocomplete="off">
       {{template "dexAddrForm" .}}
     </form>
+
+    {{- /* POST BOND FORMS */ -}}
+    <div id="postBondForms">
+      {{- /* BOND ASSET SELECTOR */ -}}
+      <form class="d-hide" id="regAssetForm">
+        {{template "regAssetForm"}}
+      </form>
+
+      {{- /* Form to set up a wallet. Shown when a user selects a bond asset without wallet. */ -}}
+      <form class="d-hide" id="newWalletForm">
+        {{template "newWalletForm" }}
+      </form>
+
+      {{- /* SYNC AND BALANCE FORM */ -}}
+      <form class="d-hide" id="walletWait">
+        {{template "waitingForWalletForm"}}
+      </form>
+
+      {{- /* CONFIRM BOND POSTING */ -}}
+      <form class="d-hide" id="confirmRegForm">
+        {{template "confirmRegistrationForm"}}
+      </form>
+    </div>
+
   </div>
 
 </div>

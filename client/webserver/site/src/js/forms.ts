@@ -706,6 +706,145 @@ export class WalletConfigForm {
 }
 
 /*
+ * PostBondForms combines the FeeAssetSelectionForm for selecting a bond asset,
+ * NewWalletForm for creating a wallet for the selected asset (where necessary),
+ * WalletWaitForm for tracking the selected wallet sync status and balance and
+ * the ConfirmRegistrationForm for submitting the post-bond request.
+ * TODO: Use this in register.ts and settings.ts.
+ */
+export class PostBondForms {
+  page: Record<string, PageElement>
+  success: () => void
+  onFormChanged?: (form: PageElement) => void
+  xc: Exchange
+  cert: string
+  newWalletForm: NewWalletForm
+  regAssetForm: FeeAssetSelectionForm
+  walletWaitForm: WalletWaitForm
+  confirmRegisterForm: ConfirmRegistrationForm
+
+  constructor (page: Record<string, PageElement>, success: () => void, pwCache?: PasswordCache) {
+    this.page = page
+    this.success = success
+
+    // SELECT REG ASSET
+    this.regAssetForm = new FeeAssetSelectionForm(page.regAssetForm, async assetID => {
+      this.confirmRegisterForm.setAsset(assetID)
+
+      const asset = app().assets[assetID]
+      const wallet = asset.wallet
+      if (wallet) {
+        const bondAsset = this.xc.bondAssets[asset.symbol]
+        if (wallet.synced && wallet.balance.available > bondAsset.amount) {
+          this.animateConfirmForm(page.regAssetForm)
+          return
+        }
+        const txFee = await this.getRegistrationTxFeeEstimate(assetID, page.regAssetForm)
+        this.walletWaitForm.setWallet(wallet, txFee)
+        slideSwap(page.regAssetForm, page.walletWait)
+        return
+      }
+      this.newWalletForm.setAsset(assetID)
+      slideSwap(page.regAssetForm, page.newWalletForm)
+    })
+
+    // CREATE WALLET FOR SELECTED ASSET, IF NECESSARY
+    this.newWalletForm = new NewWalletForm(
+      page.newWalletForm,
+      assetID => this.newWalletCreated(assetID),
+      pwCache,
+      () => this.animateRegAsset(page.newWalletForm)
+    )
+
+    // WAIT FOR WALLET TO SYNC OR REQUIRED MIN. BALANCE, IF NECESSARY
+    this.walletWaitForm = new WalletWaitForm(page.walletWait, () => {
+      this.animateConfirmForm(page.walletWait)
+    }, () => { this.animateRegAsset(page.walletWait) })
+
+    // SUBMIT POST BOND FORM
+    this.confirmRegisterForm = new ConfirmRegistrationForm(page.confirmRegForm, () => {
+      this.registerDEXSuccess()
+    }, () => {
+      this.animateRegAsset(page.confirmRegForm)
+    }, pwCache)
+  }
+
+  refresh () {
+    const page = this.page
+    this.regAssetForm.animate()
+    Doc.hide(page.newWalletForm, page.walletWait, page.confirmRegForm)
+    Doc.show(page.regAssetForm)
+  }
+
+  setOnFormChanged (cb: (form: PageElement) => void) {
+    this.onFormChanged = cb
+  }
+
+  /* setExchange sets the exchange for which the fee is being paid. */
+  setExchange (xc: Exchange, certFile: string) {
+    this.xc = xc
+    this.cert = certFile
+    this.confirmRegisterForm.setExchange(xc, certFile)
+    this.walletWaitForm.setExchange(xc)
+    this.regAssetForm.setExchange(xc)
+  }
+
+  async newWalletCreated (assetID: number) {
+    this.regAssetForm.refresh()
+    const user = await app().fetchUser()
+    if (!user) return
+    const page = this.page
+    const asset = user.assets[assetID]
+    const wallet = asset.wallet
+    const bondAmt = this.xc.bondAssets[asset.symbol].amount
+
+    if (wallet.synced && wallet.balance.available > bondAmt) {
+      await this.animateConfirmForm(page.newWalletForm)
+      return
+    }
+
+    const txFee = await this.getRegistrationTxFeeEstimate(assetID, page.newWalletForm)
+    this.walletWaitForm.setWallet(wallet, txFee)
+    await slideSwap(page.newWalletForm, page.walletWait)
+  }
+
+  // Retrieve an estimate for the tx fee needed to pay the registration fee.
+  async getRegistrationTxFeeEstimate (assetID: number, form: HTMLElement) {
+    const loaded = app().loading(form)
+    const res = await postJSON('/api/regtxfee', {
+      addr: this.xc.host,
+      cert: this.cert,
+      asset: assetID
+    })
+    loaded()
+    if (!app().checkResponse(res)) {
+      return 0
+    }
+    return res.txfee
+  }
+
+  /* Swap in the asset selection form and run the animation. */
+  async animateRegAsset (oldForm: HTMLElement) {
+    Doc.hide(oldForm)
+    this.regAssetForm.animate()
+    Doc.show(this.page.regAssetForm)
+  }
+
+  /* Swap in the confirmation form and run the animation. */
+  async animateConfirmForm (oldForm: HTMLElement) {
+    this.confirmRegisterForm.animate()
+    Doc.hide(oldForm)
+    Doc.show(this.page.confirmRegForm)
+  }
+
+  /* Called after successful registration to a DEX. */
+  async registerDEXSuccess () {
+    await app().fetchUser()
+    this.success()
+  }
+}
+
+/*
  * ConfirmRegistrationForm should be used with the "confirmRegistrationForm"
  * template.
  */
@@ -716,9 +855,9 @@ export class ConfirmRegistrationForm {
   xc: Exchange
   certFile: string
   feeAssetID: number
-  pwCache: PasswordCache
+  pwCache?: PasswordCache
 
-  constructor (form: HTMLElement, success: () => void, goBack: () => void, pwCache: PasswordCache) {
+  constructor (form: HTMLElement, success: () => void, goBack: () => void, pwCache?: PasswordCache) {
     this.form = form
     this.success = success
     this.page = Doc.parseTemplate(form)

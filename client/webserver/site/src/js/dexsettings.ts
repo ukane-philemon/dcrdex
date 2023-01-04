@@ -22,16 +22,18 @@ export default class DexSettingsPage extends BasePage {
   host: string
   keyup: (e: KeyboardEvent) => void
   dexAddrForm: forms.DEXAddressForm
+  postBondForms: forms.PostBondForms
 
   constructor (body: HTMLElement) {
     super()
     this.body = body
     this.host = body.dataset.host ? body.dataset.host : ''
     const page = this.page = Doc.idDescendants(body)
-    this.forms = Doc.applySelector(page.forms, ':scope > form')
+    this.forms = Doc.applySelector(page.forms, ':scope > form').concat(page.postBondForms)
 
     Doc.bind(page.exportDexBtn, 'click', () => this.prepareAccountExport(page.authorizeAccountExportForm))
     Doc.bind(page.disableAcctBtn, 'click', () => this.prepareAccountDisable(page.disableAccountForm))
+    Doc.bind(page.postBondBtn, 'click', () => this.preparePostBond())
     Doc.bind(page.updateCertBtn, 'click', () => page.certFileInput.click())
     Doc.bind(page.updateHostBtn, 'click', () => this.prepareUpdateHost())
     Doc.bind(page.certFileInput, 'change', () => this.onCertFileChange())
@@ -39,6 +41,12 @@ export default class DexSettingsPage extends BasePage {
     this.dexAddrForm = new forms.DEXAddressForm(page.dexAddrForm, async (xc: Exchange) => {
       window.location.assign(`/dexsettings/${xc.host}`)
     }, undefined, this.host)
+
+    this.postBondForms = new forms.PostBondForms(page, () => {
+      Doc.hide(page.forms)
+      window.location.reload()
+    })
+    this.postBondForms.setExchange(app().exchanges[this.host], '')
 
     forms.bind(page.authorizeAccountExportForm, page.authorizeExportAccountConfirm, () => this.exportAccount())
     forms.bind(page.disableAccountForm, page.disableAccountConfirm, () => this.disableAccount())
@@ -151,6 +159,12 @@ export default class DexSettingsPage extends BasePage {
     page.disableAccountHost.textContent = this.host
     page.disableAccountErr.textContent = ''
     this.showForm(disableAccountForm)
+  }
+
+  async preparePostBond () {
+    const page = this.page
+    this.postBondForms.refresh()
+    this.showForm(page.postBondForms)
   }
 
   async prepareUpdateHost () {
