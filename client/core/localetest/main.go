@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"decred.org/dcrdex/client/core"
+	"decred.org/dcrdex/client/i18n"
 )
 
 func main() {
-	missing, stale := core.CheckTopicLangs()
+	missing, stale := i18n.CheckTranslations()
 	if len(missing) == 0 && len(stale) == 0 {
 		fmt.Println("No missing or stale notification translations!")
 		os.Exit(0)

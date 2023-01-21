@@ -28,6 +28,7 @@ import (
 	"decred.org/dcrdex/client/comms"
 	"decred.org/dcrdex/client/db"
 	"decred.org/dcrdex/client/db/bolt"
+	"decred.org/dcrdex/client/i18n"
 	"decred.org/dcrdex/client/orderbook"
 	"decred.org/dcrdex/dex"
 	"decred.org/dcrdex/dex/calc"
@@ -44,7 +45,6 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/decred/go-socks/socks"
 	"golang.org/x/text/language"
-	"golang.org/x/text/message"
 )
 
 const (
@@ -675,7 +675,7 @@ func (c *Core) tryCancelTrade(dc *dexConnection, tracker *trackedTrade) error {
 	c.log.Infof("Cancel order %s targeting order %s at %s has been placed",
 		co.ID(), oid, dc.acct.host)
 
-	subject, details := c.formatDetails(TopicCancellingOrder, tracker.token())
+	subject, details := c.formatNotification(TopicCancellingOrder, tracker.token())
 	c.notify(newOrderNote(TopicCancellingOrder, subject, details, db.Poke, tracker.coreOrderInternal()))
 
 	return nil
@@ -1344,8 +1344,7 @@ type Core struct {
 	loginMtx sync.Mutex
 	loggedIn bool
 
-	locale        map[Topic]*translation
-	localePrinter *message.Printer
+	translator *i18n.Translator
 
 	credMtx     sync.RWMutex
 	credentials *db.PrimaryCredentials
@@ -1418,20 +1417,14 @@ func New(cfg *Config) (*Core, error) {
 	} else { // default to torproxy if onion not set explicitly
 		cfg.Onion = cfg.TorProxy
 	}
+
 	lang := language.AmericanEnglish
 	if cfg.Language != "" {
 		acceptLang, err := language.Parse(cfg.Language)
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse requested language: %w", err)
 		}
-		var langs []language.Tag
-		for locale := range locales {
-			tag, err := language.Parse(locale)
-			if err != nil {
-				return nil, fmt.Errorf("bad %v: %w", locale, err)
-			}
-			langs = append(langs, tag)
-		}
+		langs := i18n.AvailableLangs()
 		matcher := language.NewMatcher(langs)
 		_, idx, conf := matcher.Match(acceptLang) // use index because tag may end up as something hyper specific like zh-Hans-u-rg-cnzzzz
 		tag := langs[idx]
@@ -1444,12 +1437,11 @@ func New(cfg *Config) (*Core, error) {
 		}
 		lang = tag
 	}
-	cfg.Logger.Debugf("Using locale printer for %q", lang)
 
-	locale, found := locales[lang.String()]
-	if !found {
-		return nil, fmt.Errorf("No translations for language %s", lang)
-	}
+	// Configure assets package translator to use provided language.
+	asset.Translator.SetLanguage(lang)
+
+	cfg.Logger.Debugf("Using locale printer for %q", lang)
 
 	// Try to get the primary credentials, but ignore no-credentials error here
 	// because the client may not be initialized.
@@ -1484,8 +1476,8 @@ func New(cfg *Config) (*Core, error) {
 		latencyQ:      wait.NewTickerQueue(recheckInterval),
 		noteChans:     make(map[uint64]chan Notification),
 
-		locale:             locale,
-		localePrinter:      message.NewPrinter(lang),
+		translator: i18n.NewPackageTranslator("core", lang),
+
 		seedGenerationTime: seedGenerationTime,
 
 		fiatRateSources: make(map[string]*commonRateSource),
@@ -2319,7 +2311,7 @@ func (c *Core) CreateWallet(appPW, walletPW []byte, form *WalletForm) error {
 		// use nil here.
 		if _, err := c.createWalletOrToken(crypter, nil, form); err != nil {
 			c.log.Errorf("failed to create token wallet: %v", err)
-			subject, details := c.formatDetails(TopicQueuedCreationFailed, unbip(token.ParentID), symbol)
+			subject, details := c.formatNotification(TopicQueuedCreationFailed, unbip(token.ParentID), symbol)
 			c.notify(newWalletCreationNote(TopicQueuedCreationFailed, subject, details, db.ErrorLevel, assetID))
 		} else {
 			c.notify(newWalletCreationNote(TopicQueuedCreationSuccess, "", "", db.Data, assetID))
@@ -2629,7 +2621,7 @@ func (c *Core) loadWallet(dbWallet *db.Wallet) (*xcWallet, error) {
 	}
 	if err != nil {
 		if errors.Is(err, asset.ErrWalletTypeDisabled) {
-			subject, details := c.formatDetails(TopicWalletTypeDeprecated, unbip(assetID))
+			subject, details := c.formatNotification(TopicWalletTypeDeprecated, unbip(assetID))
 			c.notify(newWalletConfigNote(TopicWalletTypeDeprecated, subject, details, db.WarningLevel, nil))
 		}
 		return nil, fmt.Errorf("error opening wallet: %w", err)
@@ -3090,7 +3082,7 @@ func (c *Core) ReconfigureWallet(appPW, newWalletPW []byte, form *WalletForm) er
 		}
 
 		c.notify(newBalanceNote(assetID, balances)) // redundant with wallet config note?
-		subject, details := c.formatDetails(TopicWalletConfigurationUpdated, unbip(assetID), w.address)
+		subject, details := c.formatNotification(TopicWalletConfigurationUpdated, unbip(assetID), w.address)
 		c.notify(newWalletConfigNote(TopicWalletConfigurationUpdated, subject, details, db.Success, w.state()))
 
 		return nil
@@ -3427,7 +3419,7 @@ func (c *Core) setWalletPassword(wallet *xcWallet, newPW []byte, crypter encrypt
 
 	// Do not disconnect because the Wallet may not allow reconnection.
 
-	subject, details := c.formatDetails(TopicWalletPasswordUpdated, unbip(wallet.AssetID))
+	subject, details := c.formatNotification(TopicWalletPasswordUpdated, unbip(wallet.AssetID))
 	c.notify(newWalletConfigNote(TopicWalletPasswordUpdated, subject, details, db.Success, wallet.state()))
 
 	return nil
@@ -3966,7 +3958,7 @@ func (c *Core) Register(form *RegisterForm) (*RegisterResult, error) {
 
 	c.updateAssetBalance(regFeeAssetID)
 
-	subject, details := c.formatDetails(TopicFeePaymentInProgress, reqConfs, dc.acct.host)
+	subject, details := c.formatNotification(TopicFeePaymentInProgress, reqConfs, dc.acct.host)
 	c.notify(newFeePaymentNote(TopicFeePaymentInProgress, subject, details, db.Success, dc.acct.host))
 
 	// Set up the coin waiter, which waits for the required number of
@@ -4107,7 +4099,7 @@ func (c *Core) verifyRegistrationFee(assetID uint32, dc *dexConnection, coinID [
 
 		if confs < reqConfs {
 			dc.setPendingFee(assetID, confs)
-			subject, details := c.formatDetails(TopicRegUpdate, confs, reqConfs)
+			subject, details := c.formatNotification(TopicRegUpdate, confs, reqConfs)
 			c.notify(newFeePaymentNoteWithConfirmations(TopicRegUpdate, subject, details, db.Data, assetID, confs, dc.acct.host))
 		}
 
@@ -4119,11 +4111,11 @@ func (c *Core) verifyRegistrationFee(assetID uint32, dc *dexConnection, coinID [
 		c.log.Debugf("Registration fee txn %s now has %d confirmations.", coinIDString(wallet.AssetID, coinID), reqConfs)
 		defer func() {
 			if err != nil {
-				subject, details := c.formatDetails(TopicFeePaymentError, dc.acct.host, err)
+				subject, details := c.formatNotification(TopicFeePaymentError, dc.acct.host, err)
 				c.notify(newFeePaymentNote(TopicFeePaymentError, subject, details, db.ErrorLevel, dc.acct.host))
 			} else {
 				dc.clearPendingFee()
-				subject, details := c.formatDetails(TopicAccountRegistered, dc.acct.host)
+				subject, details := c.formatNotification(TopicAccountRegistered, dc.acct.host)
 				c.notify(newFeePaymentNote(TopicAccountRegistered, subject, details, db.Success, dc.acct.host))
 			}
 		}()
@@ -4181,7 +4173,7 @@ func (c *Core) InitializeClient(pw, restorationSeed []byte) error {
 	c.setCredentials(creds)
 
 	if len(restorationSeed) == 0 {
-		subject, details := c.formatDetails(TopicSeedNeedsSaving)
+		subject, details := c.formatNotification(TopicSeedNeedsSaving)
 		c.notify(newSecurityNote(TopicSeedNeedsSaving, subject, details, db.Success))
 	}
 
@@ -4329,7 +4321,7 @@ func (c *Core) connectWallets() {
 				// NOTE: Details for this topic is in the context of fee
 				// payment, but the subject pertains to a failure to connect
 				// to the wallet.
-				subject, _ := c.formatDetails(TopicWalletConnectionWarning)
+				subject, _ := c.formatNotification(TopicWalletConnectionWarning)
 				c.notify(newWalletConfigNote(TopicWalletConnectionWarning, subject, err.Error(),
 					db.ErrorLevel, wallet.state()))
 				return
@@ -4396,7 +4388,7 @@ func (c *Core) initializePrimaryCredentials(pw []byte, oldKeyParams []byte) erro
 
 	c.setCredentials(creds)
 
-	subject, details := c.formatDetails(TopicUpgradedToSeed)
+	subject, details := c.formatNotification(TopicUpgradedToSeed)
 	c.notify(newSecurityNote(TopicUpgradedToSeed, subject, details, db.WarningLevel))
 
 	for assetID, newEncPW := range walletUpdates {
@@ -4703,7 +4695,7 @@ func (c *Core) initializeDEXConnections(crypter encrypt.Crypter) {
 		// locked, and needs unlocked.
 		err := dc.acct.unlock(crypter)
 		if err != nil {
-			subject, details := c.formatDetails(TopicAccountUnlockError, dc.acct.host, err)
+			subject, details := c.formatNotification(TopicAccountUnlockError, dc.acct.host, err)
 			c.notify(newFeePaymentNote(TopicAccountUnlockError, subject, details, db.ErrorLevel, dc.acct.host)) // newDEXAuthNote?
 			continue
 		}
@@ -4717,14 +4709,14 @@ func (c *Core) initializeDEXConnections(crypter encrypt.Crypter) {
 			feeWallet, err := c.connectedWallet(dc.acct.feeAssetID)
 			if err != nil {
 				c.log.Debugf("Failed to connect for reFee at %s with error: %v", dc.acct.host, err)
-				subject, details := c.formatDetails(TopicWalletConnectionWarning, dc.acct.host)
+				subject, details := c.formatNotification(TopicWalletConnectionWarning, dc.acct.host)
 				c.notify(newFeePaymentNote(TopicWalletConnectionWarning, subject, details, db.WarningLevel, dc.acct.host))
 				continue
 			}
 			if !feeWallet.unlocked() {
 				err = c.unlockWallet(crypter, feeWallet)
 				if err != nil {
-					subject, details := c.formatDetails(TopicWalletUnlockError, dc.acct.host, err)
+					subject, details := c.formatNotification(TopicWalletUnlockError, dc.acct.host, err)
 					c.notify(newFeePaymentNote(TopicWalletUnlockError, subject, details, db.ErrorLevel, dc.acct.host))
 					continue
 				}
@@ -4738,7 +4730,7 @@ func (c *Core) initializeDEXConnections(crypter encrypt.Crypter) {
 		if dc.IsDown() {
 			c.log.Warnf("Connection to %v not available for authorization. "+
 				"It will automatically authorize when it connects.", dc.acct.host)
-			subject, details := c.formatDetails(TopicDEXDisconnected, dc.acct.host)
+			subject, details := c.formatNotification(TopicDEXDisconnected, dc.acct.host)
 			c.notify(newConnEventNote(TopicDEXDisconnected, subject, dc.acct.host, comms.Disconnected, details, db.ErrorLevel))
 			continue
 		}
@@ -4748,7 +4740,7 @@ func (c *Core) initializeDEXConnections(crypter encrypt.Crypter) {
 			defer wg.Done()
 			err := c.authDEX(dc)
 			if err != nil {
-				subject, details := c.formatDetails(TopicDexAuthError, dc.acct.host, err)
+				subject, details := c.formatNotification(TopicDexAuthError, dc.acct.host, err)
 				c.notify(newDEXAuthNote(TopicDexAuthError, subject, dc.acct.host, false, details, db.ErrorLevel))
 				return
 			}
@@ -4948,13 +4940,13 @@ func (c *Core) Send(pw []byte, assetID uint32, value uint64, address string, sub
 		}
 	}
 	if err != nil {
-		subject, details := c.formatDetails(TopicSendError, unbip(assetID), err)
+		subject, details := c.formatNotification(TopicSendError, unbip(assetID), err)
 		c.notify(newSendNote(TopicSendError, subject, details, db.ErrorLevel))
 		return nil, err
 	}
 
 	sentValue := wallet.Info().UnitInfo.ConventionalString(coin.Value())
-	subject, details := c.formatDetails(TopicSendSuccess, sentValue, unbip(assetID), address, coin)
+	subject, details := c.formatNotification(TopicSendSuccess, sentValue, unbip(assetID), address, coin)
 	c.notify(newSendNote(TopicSendSuccess, subject, details, db.Success))
 
 	c.updateAssetBalance(assetID)
@@ -5179,7 +5171,7 @@ func (c *Core) TradeAsync(pw []byte, form *TradeForm) (*InFlightOrder, error) {
 		if err != nil {
 			// Send async order error note.
 			topic := TopicAsyncOrderFailure
-			subject, details := c.formatDetails(topic, tempID, err)
+			subject, details := c.formatNotification(topic, tempID, err)
 			c.notify(newOrderNoteWithTempID(topic, subject, details, db.ErrorLevel, corder, tempID))
 		}
 	}()
@@ -5584,7 +5576,7 @@ func (c *Core) sendTradeRequest(tr *tradeRequest) (*Order, error) {
 
 	// Prepare and store the tracker and get the core.Order to return.
 	tracker := newTrackedTrade(dbOrder, preImg, dc, c.lockTimeTaker, c.lockTimeMaker,
-		c.db, c.latencyQ, wallets, coins, c.notify, c.formatDetails)
+		c.db, c.latencyQ, wallets, coins, c.notify, c.formatNotification)
 
 	tracker.redemptionLocked = tracker.redemptionReserves
 	tracker.refundLocked = tracker.refundReserves
@@ -5603,7 +5595,7 @@ func (c *Core) sendTradeRequest(tr *tradeRequest) (*Order, error) {
 	corder := tracker.coreOrder()
 	if !form.IsLimit && !form.Sell {
 		ui := wallets.quoteWallet.Info().UnitInfo
-		subject, details := c.formatDetails(TopicYoloPlaced,
+		subject, details := c.formatNotification(TopicYoloPlaced,
 			ui.ConventionalString(corder.Qty), ui.Conventional.Unit, tracker.token())
 		c.notify(newOrderNoteWithTempID(TopicYoloPlaced, subject, details, db.Poke, corder, tr.tempID))
 	} else {
@@ -5616,7 +5608,7 @@ func (c *Core) sendTradeRequest(tr *tradeRequest) (*Order, error) {
 		if corder.Sell {
 			topic = TopicSellOrderPlaced
 		}
-		subject, details := c.formatDetails(topic, ui.ConventionalString(corder.Qty), ui.Conventional.Unit, rateString, tracker.token())
+		subject, details := c.formatNotification(topic, ui.ConventionalString(corder.Qty), ui.Conventional.Unit, rateString, tracker.token())
 		c.notify(newOrderNoteWithTempID(topic, subject, details, db.Poke, corder, tr.tempID))
 	}
 
@@ -6002,7 +5994,7 @@ func (c *Core) authDEX(dc *dexConnection) error {
 				updatedAssets.count(trade.wallets.fromWallet.AssetID)
 			}
 
-			subject, details := c.formatDetails(TopicMissingMatches,
+			subject, details := c.formatNotification(TopicMissingMatches,
 				len(missing), trade.token(), dc.acct.host)
 			c.notify(newOrderNote(TopicMissingMatches, subject, details, db.ErrorLevel, trade.coreOrderInternal()))
 		}
@@ -6013,7 +6005,7 @@ func (c *Core) authDEX(dc *dexConnection) error {
 			if err != nil {
 				c.log.Errorf("Error negotiating one or more previously unknown matches for order %s reported by %s on connect: %v",
 					oid, dc.acct.host, err)
-				subject, details := c.formatDetails(TopicMatchResolutionError, len(extras), dc.acct.host, trade.token())
+				subject, details := c.formatNotification(TopicMatchResolutionError, len(extras), dc.acct.host, trade.token())
 				c.notify(newOrderNote(TopicMatchResolutionError, subject, details, db.ErrorLevel, trade.coreOrderInternal()))
 			} else {
 				// For taker matches in MakerSwapCast, queue up match status
@@ -6051,11 +6043,11 @@ func (c *Core) authDEX(dc *dexConnection) error {
 	// used to properly set order statuses and filled amount.
 	unknownOrders, reconciledOrdersCount := dc.reconcileTrades(result.ActiveOrderStatuses)
 	if len(unknownOrders) > 0 {
-		subject, details := c.formatDetails(TopicUnknownOrders, len(unknownOrders), dc.acct.host)
+		subject, details := c.formatNotification(TopicUnknownOrders, len(unknownOrders), dc.acct.host)
 		c.notify(newDEXAuthNote(TopicUnknownOrders, subject, dc.acct.host, false, details, db.Poke))
 	}
 	if reconciledOrdersCount > 0 {
-		subject, details := c.formatDetails(TopicOrdersReconciled, reconciledOrdersCount)
+		subject, details := c.formatNotification(TopicOrdersReconciled, reconciledOrdersCount)
 		c.notify(newDEXAuthNote(TopicOrdersReconciled, subject, dc.acct.host, false, details, db.Poke))
 	}
 
@@ -6336,11 +6328,11 @@ func (c *Core) reFee(wallet *xcWallet, dc *dexConnection) {
 		err := c.notifyFee(dc, acctInfo.LegacyFeeCoin)
 		if err != nil {
 			c.log.Errorf("reFee %s - notifyfee error: %v", dc.acct.host, err)
-			subject, details := c.formatDetails(TopicFeePaymentError, dc.acct.host, err)
+			subject, details := c.formatNotification(TopicFeePaymentError, dc.acct.host, err)
 			c.notify(newFeePaymentNote(TopicFeePaymentError, subject, details, db.ErrorLevel, dc.acct.host))
 		} else {
 			c.log.Infof("Fee paid at %s", dc.acct.host)
-			subject, details := c.formatDetails(TopicAccountRegistered, dc.acct.host)
+			subject, details := c.formatNotification(TopicAccountRegistered, dc.acct.host)
 			c.notify(newFeePaymentNote(TopicAccountRegistered, subject, details, db.Success, dc.acct.host))
 			// dc.acct.pay() and c.authDEX????
 			dc.acct.markFeePaid()
@@ -6459,7 +6451,7 @@ func (c *Core) dbTrackers(dc *dexConnection) (map[order.OrderID]*trackedTrade, e
 		var preImg order.Preimage
 		copy(preImg[:], dbOrder.MetaData.Proof.Preimage)
 		tracker := newTrackedTrade(dbOrder, preImg, dc, c.lockTimeTaker, c.lockTimeMaker,
-			c.db, c.latencyQ, nil, nil, c.notify, c.formatDetails)
+			c.db, c.latencyQ, nil, nil, c.notify, c.formatNotification)
 		tracker.readyToTick = false
 		trackers[dbOrder.Order.ID()] = tracker
 
@@ -6573,7 +6565,7 @@ func (c *Core) loadDBTrades(dc *dexConnection) error {
 		walletSet, assetConfigs, versCompat, err := c.walletSet(dc, tracker.Base(), tracker.Quote(), trade.Sell)
 		if err != nil {
 			err = fmt.Errorf("failed to load wallets for trade ID %s: %w", tracker.ID(), err)
-			subject, details := c.formatDetails(TopicOrderLoadFailure, err)
+			subject, details := c.formatNotification(TopicOrderLoadFailure, err)
 			c.notify(newOrderNote(TopicOrderLoadFailure, subject, details, db.ErrorLevel, nil))
 			continue
 		}
@@ -6625,7 +6617,7 @@ func (c *Core) loadDBTrades(dc *dexConnection) error {
 // not be found or the audit info could not be loaded.
 func (c *Core) resumeTrade(tracker *trackedTrade, crypter encrypt.Crypter, failed map[uint32]bool, relocks assetMap) bool {
 	notifyErr := func(tracker *trackedTrade, topic Topic, args ...interface{}) {
-		subject, detail := c.formatDetails(topic, args...)
+		subject, detail := c.formatNotification(topic, args...)
 		c.notify(newOrderNote(topic, subject, detail, db.ErrorLevel, tracker.coreOrderInternal()))
 	}
 
@@ -6755,7 +6747,7 @@ func (c *Core) resumeTrade(tracker *trackedTrade, crypter encrypt.Crypter, faile
 							c.log.Debugf("AuditContract error for match %v status %v, refunded = %v, revoked = %v: %v",
 								match, match.Status, len(match.MetaData.Proof.RefundCoin) > 0,
 								match.MetaData.Proof.IsRevoked(), err)
-							subject, detail := c.formatDetails(TopicMatchRecoveryError,
+							subject, detail := c.formatNotification(TopicMatchRecoveryError,
 								unbip(toAssetID), contractStr, tracker.token(), err)
 							c.notify(newOrderNote(TopicMatchRecoveryError, subject, detail,
 								db.ErrorLevel, tracker.coreOrderInternal())) // tracker.mtx already locked
@@ -6900,7 +6892,7 @@ func (c *Core) resumeTrades(crypter encrypt.Crypter) {
 				tracker.mtx.RLock()
 				err := fmt.Errorf("failed to connect and unlock wallets for trade ID %s", tracker.ID())
 				tracker.mtx.RUnlock()
-				subject, details := c.formatDetails(TopicOrderResumeFailure, err)
+				subject, details := c.formatNotification(TopicOrderResumeFailure, err)
 				c.notify(newOrderNote(TopicOrderResumeFailure, subject, details, db.ErrorLevel, nil))
 			}
 		}
@@ -6930,7 +6922,7 @@ func (c *Core) reReserveFunding(w *xcWallet) {
 			}
 
 			notifyErr := func(topic Topic, args ...interface{}) {
-				subject, detail := c.formatDetails(topic, args...)
+				subject, detail := c.formatNotification(topic, args...)
 				c.notify(newOrderNote(topic, subject, detail, db.ErrorLevel, tracker.coreOrderInternal()))
 			}
 
@@ -7164,7 +7156,7 @@ func (c *Core) runMatches(tradeMatches map[order.OrderID]*serverMatches) (assetM
 // sendOutdatedClientNotification will send a notification to the UI that
 // indicates the client should be updated to be used with this DEX server.
 func sendOutdatedClientNotification(c *Core, dc *dexConnection) {
-	subject, details := c.formatDetails(TopicUpgradeNeeded, dc.acct.host)
+	subject, details := c.formatNotification(TopicUpgradeNeeded, dc.acct.host)
 	c.notify(newUpgradeNote(TopicUpgradeNeeded, subject, details, db.WarningLevel))
 }
 
@@ -7531,7 +7523,7 @@ func (c *Core) handleConnectEvent(dc *dexConnection, status comms.ConnectionStat
 	}
 
 	if dc.broadcastingConnect() {
-		subject, details := c.formatDetails(topic, dc.acct.host)
+		subject, details := c.formatNotification(topic, dc.acct.host)
 		dc.notify(newConnEventNote(topic, subject, dc.acct.host, status, details, db.Poke))
 	}
 }
@@ -7601,7 +7593,7 @@ func handleRevokeOrderMsg(c *Core, dc *dexConnection, msg *msgjson.Message) erro
 		// revoke the targeted order, just unlink the cancel order.
 		c.log.Warnf("Deleting failed cancel order %v that targeted trade order %v", oid, tracker.ID())
 		tracker.deleteCancelOrder()
-		subject, details := c.formatDetails(TopicFailedCancel, tracker.token())
+		subject, details := c.formatNotification(TopicFailedCancel, tracker.token())
 		c.notify(newOrderNote(TopicFailedCancel, subject, details, db.WarningLevel, tracker.coreOrder()))
 		return nil
 	}
@@ -7614,7 +7606,7 @@ func handleRevokeOrderMsg(c *Core, dc *dexConnection, msg *msgjson.Message) erro
 	}
 	tracker.revoke()
 
-	subject, details := c.formatDetails(TopicOrderRevoked, tracker.token(), tracker.mktID, dc.acct.host)
+	subject, details := c.formatNotification(TopicOrderRevoked, tracker.token(), tracker.mktID, dc.acct.host)
 	c.notify(newOrderNote(TopicOrderRevoked, subject, details, db.ErrorLevel, tracker.coreOrder()))
 
 	// Update market orders, and the balance to account for unlocked coins.
@@ -7664,7 +7656,7 @@ func handleNotifyMsg(c *Core, dc *dexConnection, msg *msgjson.Message) error {
 	if err != nil {
 		return fmt.Errorf("notify unmarshal error: %w", err)
 	}
-	subject, details := c.formatDetails(TopicDEXNotification, dc.acct.host, txt)
+	subject, details := c.formatNotification(TopicDEXNotification, dc.acct.host, txt)
 	c.notify(newServerNotifyNote(TopicDEXNotification, subject, details, db.WarningLevel))
 	return nil
 }
@@ -7685,7 +7677,7 @@ func handlePenaltyMsg(c *Core, dc *dexConnection, msg *msgjson.Message) error {
 	}
 	t := time.UnixMilli(int64(note.Penalty.Time))
 
-	subject, details := c.formatDetails(TopicPenalized, dc.acct.host, note.Penalty.Rule, t, note.Penalty.Details)
+	subject, details := c.formatNotification(TopicPenalized, dc.acct.host, note.Penalty.Rule, t, note.Penalty.Details)
 	c.notify(newServerNotifyNote(TopicPenalized, subject, details, db.WarningLevel))
 	return nil
 }
@@ -8427,7 +8419,7 @@ func (c *Core) peerChange(w *xcWallet, numPeers uint32, err error) {
 	// leave synced alone. This excludes the unknown state (-1) prior to the
 	// initial peer count report.
 	if wasDisconnected && numPeers > 0 {
-		subject, details := c.formatDetails(TopicWalletPeersRestored, w.Info().Name)
+		subject, details := c.formatNotification(TopicWalletPeersRestored, w.Info().Name)
 		c.notify(newWalletConfigNote(TopicWalletPeersRestored, subject, details,
 			db.Success, w.state()))
 		c.startWalletSyncMonitor(w)
@@ -8437,12 +8429,12 @@ func (c *Core) peerChange(w *xcWallet, numPeers uint32, err error) {
 	if atomic.LoadUint32(w.broadcasting) == 1 {
 		if (numPeers == 0 || err != nil) && !wasDisconnected { // was connected or initial report
 			if err != nil {
-				subject, details := c.formatDetails(TopicWalletCommsWarning,
+				subject, details := c.formatNotification(TopicWalletCommsWarning,
 					w.Info().Name, err.Error())
 				c.notify(newWalletConfigNote(TopicWalletCommsWarning, subject, details,
 					db.ErrorLevel, w.state()))
 			} else {
-				subject, details := c.formatDetails(TopicWalletPeersWarning, w.Info().Name)
+				subject, details := c.formatNotification(TopicWalletPeersWarning, w.Info().Name)
 				c.notify(newWalletConfigNote(TopicWalletPeersWarning, subject, details,
 					db.WarningLevel, w.state()))
 			}

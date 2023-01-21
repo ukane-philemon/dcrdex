@@ -1983,10 +1983,10 @@ func (c *Core) tick(t *trackedTrade) (assetMap, error) {
 		ui := t.wallets.fromWallet.Info().UnitInfo
 		if err != nil {
 			errs.addErr(err)
-			subject, details := c.formatDetails(TopicSwapSendError, ui.ConventionalString(qty), ui.Conventional.Unit, t.token())
+			subject, details := c.formatNotification(TopicSwapSendError, ui.ConventionalString(qty), ui.Conventional.Unit, t.token())
 			t.notify(newOrderNote(TopicSwapSendError, subject, details, db.ErrorLevel, corder))
 		} else {
-			subject, details := c.formatDetails(TopicSwapsInitiated, ui.ConventionalString(qty), ui.Conventional.Unit, t.token())
+			subject, details := c.formatNotification(TopicSwapsInitiated, ui.ConventionalString(qty), ui.Conventional.Unit, t.token())
 			t.notify(newOrderNote(TopicSwapsInitiated, subject, details, db.Poke, corder))
 		}
 	}
@@ -2008,11 +2008,11 @@ func (c *Core) tick(t *trackedTrade) (assetMap, error) {
 		ui := t.wallets.toWallet.Info().UnitInfo
 		if err != nil {
 			errs.addErr(err)
-			subject, details := c.formatDetails(TopicRedemptionError,
+			subject, details := c.formatNotification(TopicRedemptionError,
 				ui.ConventionalString(qty), ui.Conventional.Unit, t.token())
 			t.notify(newOrderNote(TopicRedemptionError, subject, details, db.ErrorLevel, corder))
 		} else {
-			subject, details := c.formatDetails(TopicMatchComplete,
+			subject, details := c.formatNotification(TopicMatchComplete,
 				ui.ConventionalString(qty), ui.Conventional.Unit, t.token())
 			t.notify(newOrderNote(TopicMatchComplete, subject, details, db.Poke, corder))
 		}
@@ -2031,11 +2031,11 @@ func (c *Core) tick(t *trackedTrade) (assetMap, error) {
 		ui := t.wallets.fromWallet.Info().UnitInfo
 		if err != nil {
 			errs.addErr(err)
-			subject, details := c.formatDetails(TopicRefundFailure,
+			subject, details := c.formatNotification(TopicRefundFailure,
 				ui.ConventionalString(refunded), ui.Conventional.Unit, t.token())
 			t.notify(newOrderNote(TopicRefundFailure, subject, details, db.ErrorLevel, corder))
 		} else {
-			subject, details := c.formatDetails(TopicMatchesRefunded,
+			subject, details := c.formatNotification(TopicMatchesRefunded,
 				ui.ConventionalString(refunded), ui.Conventional.Unit, t.token())
 			t.notify(newOrderNote(TopicMatchesRefunded, subject, details, db.WarningLevel, corder))
 		}
@@ -2484,7 +2484,7 @@ func (c *Core) sendInitAsync(t *trackedTrade, match *matchTracker, coinID, contr
 			atomic.StoreUint32(&match.sendingInitAsync, 0)
 			if err != nil {
 				corder := t.coreOrder()
-				subject, details := c.formatDetails(TopicInitError, match, err)
+				subject, details := c.formatNotification(TopicInitError, match, err)
 				t.notify(newOrderNote(TopicInitError, subject, details, db.ErrorLevel, corder))
 			}
 		}()
@@ -2766,7 +2766,7 @@ func (c *Core) sendRedeemAsync(t *trackedTrade, match *matchTracker, coinID, sec
 			atomic.StoreUint32(&match.sendingRedeemAsync, 0)
 			if err != nil {
 				corder := t.coreOrder()
-				subject, details := c.formatDetails(TopicReportRedeemError, match, err)
+				subject, details := c.formatNotification(TopicReportRedeemError, match, err)
 				t.notify(newOrderNote(TopicReportRedeemError, subject, details, db.ErrorLevel, corder))
 			}
 		}()

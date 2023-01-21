@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"decred.org/dcrdex/client/asset"
+	"decred.org/dcrdex/client/i18n"
 	"decred.org/dcrdex/dex"
 	"decred.org/dcrdex/dex/calc"
 	"decred.org/dcrdex/dex/config"
@@ -99,78 +100,90 @@ var (
 	walletBlockAllowance         = time.Second * 10
 	conventionalConversionFactor = float64(dexbtc.UnitInfo.Conventional.ConversionFactor)
 
-	ElectrumConfigOpts = []*asset.ConfigOption{
-		{
-			Key:         "rpcuser",
-			DisplayName: "JSON-RPC Username",
-			Description: "Electrum's 'rpcuser' setting",
-		},
-		{
-			Key:         "rpcpassword",
-			DisplayName: "JSON-RPC Password",
-			Description: "Electrum's 'rpcpassword' setting",
-			NoEcho:      true,
-		},
-		{
-			Key:         "rpcport",
-			DisplayName: "JSON-RPC Port",
-			Description: "Electrum's 'rpcport' (if not set with rpcbind)",
-		},
-		{
-			Key:          "rpcbind", // match RPCConfig struct field tags
-			DisplayName:  "JSON-RPC Address",
-			Description:  "Electrum's 'rpchost' <addr> or <addr>:<port>",
-			DefaultValue: "127.0.0.1",
-		},
-		{
-			Key:          "walletname", // match RPCConfig struct field tags
-			DisplayName:  "Wallet File",
-			Description:  "Full path to the wallet file (empty is default_wallet)",
-			DefaultValue: "", // empty string, not a nil interface
-		},
-	}
-
 	// 02 Jun 21 21:12 CDT
 	defaultWalletBirthdayUnix = 1622668320
 	defaultWalletBirthday     = time.Unix(int64(defaultWalletBirthdayUnix), 0)
 
-	rpcWalletDefinition = &asset.WalletDefinition{
-		Type:              walletTypeRPC,
-		Tab:               "External",
-		Description:       "Connect to bitcoind",
-		DefaultConfigPath: dexbtc.SystemConfigPath("bitcoin"),
-		ConfigOpts:        append(RPCConfigOpts("Bitcoin", "8332"), CommonConfigOpts("BTC", true)...),
-	}
-	spvWalletDefinition = &asset.WalletDefinition{
-		Type:        walletTypeSPV,
-		Tab:         "Native",
-		Description: "Use the built-in SPV wallet",
-		ConfigOpts:  append(SPVConfigOpts("BTC"), CommonConfigOpts("BTC", true)...),
-		Seeded:      true,
-	}
+	t = asset.Translator
+)
 
-	electrumWalletDefinition = &asset.WalletDefinition{
-		Type:        walletTypeElectrum,
-		Tab:         "Electrum (external)",
-		Description: "Use an external Electrum Wallet",
-		// json: DefaultConfigPath: filepath.Join(btcutil.AppDataDir("electrum", false), "config"), // e.g. ~/.electrum/config
-		ConfigOpts: append(append(ElectrumConfigOpts, CommonConfigOpts("BTC", false)...), apiFallbackOpt(false)),
-	}
-
-	// WalletInfo defines some general information about a Bitcoin wallet.
-	WalletInfo = &asset.WalletInfo{
+// WalletInfo defines some general information about a Bitcoin wallet.
+func WalletInfo() *asset.WalletInfo {
+	return &asset.WalletInfo{
 		Name:              "Bitcoin",
 		Version:           version,
 		SupportedVersions: []uint32{version},
 		UnitInfo:          dexbtc.UnitInfo,
 		AvailableWallets: []*asset.WalletDefinition{
-			spvWalletDefinition,
-			rpcWalletDefinition,
-			electrumWalletDefinition,
+			spvWalletDefinition(),
+			rpcWalletDefinition(),
+			electrumWalletDefinition(),
 		},
 		LegacyWalletIndex: 1,
 	}
-)
+}
+
+func rpcWalletDefinition() *asset.WalletDefinition {
+	return &asset.WalletDefinition{
+		Type:              walletTypeRPC,
+		Tab:               t.Translate(i18n.External),
+		Description:       t.Translate(i18n.ConnectToBitcoind),
+		DefaultConfigPath: dexbtc.SystemConfigPath("bitcoin"),
+		ConfigOpts:        append(RPCConfigOpts("Bitcoin", "8332"), CommonConfigOpts("BTC", true)...),
+	}
+}
+
+func spvWalletDefinition() *asset.WalletDefinition {
+	return &asset.WalletDefinition{
+		Type:        walletTypeSPV,
+		Tab:         t.Translate(i18n.Native),
+		Description: t.Translate(i18n.NativeWalletDesc),
+		ConfigOpts:  append(SPVConfigOpts("BTC"), CommonConfigOpts("BTC", true)...),
+		Seeded:      true,
+	}
+}
+
+func electrumWalletDefinition() *asset.WalletDefinition {
+	return &asset.WalletDefinition{
+		Type:        walletTypeElectrum,
+		Tab:         t.Translate(i18n.ElectrumWallet),
+		Description: t.Translate(i18n.ElectrumWalletDesc),
+		// json: DefaultConfigPath: filepath.Join(btcutil.AppDataDir("electrum", false), "config"), // e.g. ~/.electrum/config
+		ConfigOpts: append(append(ElectrumConfigOpts(), CommonConfigOpts("BTC", false)...), apiFallbackOpt(false)),
+	}
+}
+func ElectrumConfigOpts() []*asset.ConfigOption {
+	return []*asset.ConfigOption{
+		{
+			Key:         "rpcuser",
+			DisplayName: t.Translate(i18n.RPCConfigUserDisplayName),
+			Description: t.Format(i18n.RPCConfigUserDescTemplate, "Electrum"),
+		},
+		{
+			Key:         "rpcpassword",
+			DisplayName: t.Translate(i18n.RPCConfigPasswordDisplayName),
+			Description: t.Format(i18n.RPCConfigPasswordDescTemplate, "Electrum"),
+			NoEcho:      true,
+		},
+		{
+			Key:         "rpcport",
+			DisplayName: t.Translate(i18n.RPCConfigPortDisplayName),
+			Description: t.Format(i18n.RPCConfigUserDescTemplate, "Electrum"),
+		},
+		{
+			Key:          "rpcbind", // match RPCConfig struct field tags
+			DisplayName:  t.Translate(i18n.RPCConfigAddressDisplayName),
+			Description:  t.Format(i18n.RPCConfigAddressDescTemplate, "Electrum", "127.0.0.1"),
+			DefaultValue: "127.0.0.1",
+		},
+		{
+			Key:          "walletname", // match RPCConfig struct field tags
+			DisplayName:  t.Translate(i18n.WalletFile),
+			Description:  t.Translate(i18n.RPCConfigWalletFileDescription),
+			DefaultValue: "", // empty string, not a nil interface
+		},
+	}
+}
 
 func apiFallbackOpt(defaultV bool) *asset.ConfigOption {
 	return &asset.ConfigOption{
@@ -257,30 +270,30 @@ func RPCConfigOpts(name, rpcPort string) []*asset.ConfigOption {
 	return []*asset.ConfigOption{
 		{
 			Key:         "walletname",
-			DisplayName: "Wallet Name",
-			Description: "The wallet name",
+			DisplayName: t.Translate(i18n.WalletName),
+			Description: t.Translate(i18n.WalletNameDesc),
 		},
 		{
 			Key:         "rpcuser",
-			DisplayName: "JSON-RPC Username",
-			Description: fmt.Sprintf("%s's 'rpcuser' setting", name),
+			DisplayName: t.Translate(i18n.RPCConfigUserDisplayName),
+			Description: t.Format(i18n.RPCConfigUserDescTemplate, name),
 		},
 		{
 			Key:         "rpcpassword",
-			DisplayName: "JSON-RPC Password",
-			Description: fmt.Sprintf("%s's 'rpcpassword' setting", name),
+			DisplayName: t.Translate(i18n.RPCConfigPasswordDisplayName),
+			Description: t.Format(i18n.RPCConfigPasswordDescTemplate, name),
 			NoEcho:      true,
 		},
 		{
-			Key:          "rpcbind",
-			DisplayName:  "JSON-RPC Address",
-			Description:  "<addr> or <addr>:<port> (default 'localhost')",
+			Key:          "rpcbind", // match RPCConfig struct field tags
+			DisplayName:  t.Translate(i18n.RPCConfigAddressDisplayName),
+			Description:  t.Format(i18n.RPCConfigAddressDescTemplate, name, "localhost"),
 			DefaultValue: "127.0.0.1",
 		},
 		{
 			Key:          "rpcport",
-			DisplayName:  "JSON-RPC Port",
-			Description:  "Port for RPC connections (if not set in rpcbind)",
+			DisplayName:  t.Translate(i18n.RPCConfigPortDisplayName),
+			Description:  t.Format(i18n.RPCConfigPortDescTemplate, name),
 			DefaultValue: rpcPort,
 		},
 	}
@@ -722,7 +735,7 @@ func (d *Driver) DecodeCoinID(coinID []byte) (string, error) {
 
 // Info returns basic information about the wallet and asset.
 func (d *Driver) Info() *asset.WalletInfo {
-	return WalletInfo
+	return WalletInfo()
 }
 
 // swapOptions captures the available Swap options. Tagged to be used with
@@ -1015,7 +1028,7 @@ func NewWallet(cfg *asset.WalletConfig, logger dex.Logger, net dex.Network) (ass
 	cloneCFG := &BTCCloneCFG{
 		WalletCFG:           cfg,
 		MinNetworkVersion:   minNetworkVersion,
-		WalletInfo:          WalletInfo,
+		WalletInfo:          WalletInfo(),
 		Symbol:              "btc",
 		Logger:              logger,
 		Network:             net,

@@ -9,6 +9,7 @@ import (
 
 	"decred.org/dcrdex/client/comms"
 	"decred.org/dcrdex/client/db"
+	"decred.org/dcrdex/client/i18n"
 	"decred.org/dcrdex/dex"
 	"decred.org/dcrdex/dex/msgjson"
 )
@@ -119,17 +120,8 @@ func (c *Core) AckNotes(ids []dex.Bytes) {
 	}
 }
 
-func (c *Core) formatDetails(topic Topic, args ...interface{}) (translatedSubject, details string) {
-	trans, found := c.locale[topic]
-	if !found {
-		c.log.Errorf("No translation found for topic %q", topic)
-		originTrans := originLocale[topic]
-		if originTrans == nil {
-			return string(topic), "translation error"
-		}
-		return originTrans.subject, fmt.Sprintf(originTrans.template, args...)
-	}
-	return trans.subject, c.localePrinter.Sprintf(string(topic), args...)
+func (c *Core) formatNotification(topic Topic, args ...interface{}) (translatedSubject, details string) {
+	return c.translator.Translate(i18n.NotificationTopicSubject(string(topic))), c.translator.Format(i18n.NotificationTopicTemplate(string(topic)))
 }
 
 // Notification is an interface for a user notification. Notification is
@@ -179,8 +171,8 @@ type SecurityNote struct {
 }
 
 const (
-	TopicSeedNeedsSaving Topic = "SeedNeedsSaving"
-	TopicUpgradedToSeed  Topic = "UpgradedToSeed"
+	TopicSeedNeedsSaving Topic = "Topic_Seed_Needs_Saving"
+	TopicUpgradedToSeed  Topic = "Topic_Upgraded_To_Seed"
 )
 
 func newSecurityNote(topic Topic, subject, details string, severity db.Severity) *SecurityNote {
@@ -190,19 +182,19 @@ func newSecurityNote(topic Topic, subject, details string, severity db.Severity)
 }
 
 const (
-	TopicFeePaymentInProgress    Topic = "FeePaymentInProgress"
-	TopicFeePaymentError         Topic = "FeePaymentError"
-	TopicFeeCoinError            Topic = "FeeCoinError"
-	TopicRegUpdate               Topic = "RegUpdate"
-	TopicBondConfirming          Topic = "BondConfirming"
-	TopicBondPostError           Topic = "BondPostError"
-	TopicBondCoinError           Topic = "BondCoinError"
-	TopicAccountRegistered       Topic = "AccountRegistered"
-	TopicAccountUnlockError      Topic = "AccountUnlockError"
-	TopicWalletConnectionWarning Topic = "WalletConnectionWarning"
-	TopicWalletUnlockError       Topic = "WalletUnlockError"
-	TopicWalletCommsWarning      Topic = "WalletCommsWarning"
-	TopicWalletPeersRestored     Topic = "WalletPeersRestored"
+	TopicFeePaymentInProgress    Topic = "Topic_Fee_Payment_In_Progress"
+	TopicFeePaymentError         Topic = "Topic_Fee_Payment_Error"
+	TopicFeeCoinError            Topic = "Topic_Fee_Coin_Error"
+	TopicRegUpdate               Topic = "Topic_Reg_Update"
+	TopicBondConfirming          Topic = "Topic_Bond_Confirming"
+	TopicBondPostError           Topic = "Topic_Bond_Post_Error"
+	TopicBondCoinError           Topic = "Topic_Bond_Coin_Error"
+	TopicAccountRegistered       Topic = "Topic_Account_Registered"
+	TopicAccountUnlockError      Topic = "Topic_Account_Unlock_Error"
+	TopicWalletConnectionWarning Topic = "Topic_Wallet_Connection_Warning"
+	TopicWalletUnlockError       Topic = "Topic_Wallet_Unlock_Error"
+	TopicWalletCommsWarning      Topic = "Topic_Wallet_Comms_Warning"
+	TopicWalletPeersRestored     Topic = "Topic_Wallet_Peers_Restored"
 )
 
 // FeePaymentNote is a notification regarding registration fee payment.
@@ -264,8 +256,8 @@ type SendNote struct {
 }
 
 const (
-	TopicSendError   Topic = "SendError"
-	TopicSendSuccess Topic = "SendSuccess"
+	TopicSendError   Topic = "Topic_Send_Error"
+	TopicSendSuccess Topic = "Topic_Send_Success"
 )
 
 func newSendNote(topic Topic, subject, details string, severity db.Severity) *SendNote {
@@ -349,14 +341,14 @@ type MatchNote struct {
 }
 
 const (
-	TopicAudit                 Topic = "Audit"
-	TopicAuditTrouble          Topic = "AuditTrouble"
-	TopicNewMatch              Topic = "NewMatch"
-	TopicCounterConfirms       Topic = "CounterConfirms"
-	TopicConfirms              Topic = "Confirms"
-	TopicRedemptionResubmitted Topic = "RedemptionResubmitted"
-	TopicSwapRefunded          Topic = "SwapRefunded"
-	TopicRedemptionConfirmed   Topic = "RedemptionConfirmed"
+	TopicAudit                 Topic = "Topic_Audit"
+	TopicAuditTrouble          Topic = "Topic_Audit_Trouble"
+	TopicNewMatch              Topic = "Topic_New_Match"
+	TopicCounterConfirms       Topic = "Topic_Counter_Confirms"
+	TopicConfirms              Topic = "Topic_Confirms"
+	TopicRedemptionResubmitted Topic = "Topic_Redemption_Resubmitted"
+	TopicSwapRefunded          Topic = "Topic_Swap_Refunded"
+	TopicRedemptionConfirmed   Topic = "Topic_Redemption_Confirmed"
 )
 
 func newMatchNote(topic Topic, subject, details string, severity db.Severity, t *trackedTrade, match *matchTracker) *MatchNote {
@@ -419,8 +411,8 @@ type ConnEventNote struct {
 }
 
 const (
-	TopicDEXConnected    Topic = "DEXConnected"
-	TopicDEXDisconnected Topic = "DEXDisconnected"
+	TopicDEXConnected    Topic = "Topic_DEX_Connected"
+	TopicDEXDisconnected Topic = "Topic_DEX_Disconnected"
 )
 
 func newConnEventNote(topic Topic, subject, host string, status comms.ConnectionStatus, details string, severity db.Severity) *ConnEventNote {
@@ -437,7 +429,7 @@ type FiatRatesNote struct {
 	FiatRates map[uint32]float64 `json:"fiatRates"`
 }
 
-const TopicFiatRatesUpdate Topic = "fiatrateupdate"
+const TopicFiatRatesUpdate Topic = "Topic_Fiat_Rates_Update"
 
 func newFiatRatesUpdate(rates map[uint32]float64) *FiatRatesNote {
 	return &FiatRatesNote{
@@ -453,7 +445,7 @@ type BalanceNote struct {
 	Balance *WalletBalance `json:"balance"`
 }
 
-const TopicBalanceUpdated Topic = "BalanceUpdated"
+const TopicBalanceUpdated Topic = "Topic_Balance_Updated"
 
 func newBalanceNote(assetID uint32, bal *WalletBalance) *BalanceNote {
 	return &BalanceNote{
@@ -470,7 +462,7 @@ type SpotPriceNote struct {
 	Spots map[string]*msgjson.Spot `json:"spots"`
 }
 
-const TopicSpotsUpdate Topic = "SpotsUpdate"
+const TopicSpotsUpdate Topic = "Topic_Spots_Update"
 
 func newSpotPriceNote(host string, spots map[string]*msgjson.Spot) *SpotPriceNote {
 	return &SpotPriceNote{
@@ -488,11 +480,11 @@ type DEXAuthNote struct {
 }
 
 const (
-	TopicDexAuthError     Topic = "DexAuthError"
-	TopicUnknownOrders    Topic = "UnknownOrders"
-	TopicOrdersReconciled Topic = "OrdersReconciled"
-	TopicBondConfirmed    Topic = "BondConfirmed"
-	TopicBondExpired      Topic = "BondExpired"
+	TopicDexAuthError     Topic = "Topic_Dex_Auth_Error"
+	TopicUnknownOrders    Topic = "Topic_Unknown_Orders"
+	TopicOrdersReconciled Topic = "Topic_Orders_Reconciled"
+	TopicBondConfirmed    Topic = "Topic_Bond_Confirmed"
+	TopicBondExpired      Topic = "Topic_Bond_Expired"
 )
 
 func newDEXAuthNote(topic Topic, subject, host string, authenticated bool, details string, severity db.Severity) *DEXAuthNote {
@@ -511,11 +503,11 @@ type WalletConfigNote struct {
 }
 
 const (
-	TopicWalletConfigurationUpdated Topic = "WalletConfigurationUpdated"
-	TopicWalletPasswordUpdated      Topic = "WalletPasswordUpdated"
-	TopicWalletPeersWarning         Topic = "WalletPeersWarning"
-	TopicWalletTypeDeprecated       Topic = "WalletTypeDeprecated"
-	TopicWalletPeersUpdate          Topic = "WalletPeersUpdate"
+	TopicWalletConfigurationUpdated Topic = "Topic_Wallet_Configuration_Updated"
+	TopicWalletPasswordUpdated      Topic = "Topic_Wallet_Password_Updated"
+	TopicWalletPeersWarning         Topic = "Topic_Wallet_Peers_Warning"
+	TopicWalletTypeDeprecated       Topic = "Topic_Wallet_Type_Deprecated"
+	TopicWalletPeersUpdate          Topic = "Wallet_Peers_Update"
 )
 
 func newWalletConfigNote(topic Topic, subject, details string, severity db.Severity, walletState *WalletState) *WalletConfigNote {

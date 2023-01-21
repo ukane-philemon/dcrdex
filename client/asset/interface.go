@@ -7,9 +7,13 @@ import (
 	"context"
 	"time"
 
+	"decred.org/dcrdex/client/i18n"
 	"decred.org/dcrdex/dex"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"golang.org/x/text/language"
 )
+
+var Translator = i18n.NewPackageTranslator("asset", language.AmericanEnglish)
 
 // WalletTrait is a bitset indicating various optional wallet features, such as
 // the presence of auxiliary methods like Rescan, Withdraw and Sweep.

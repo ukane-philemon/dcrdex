@@ -59,7 +59,7 @@ var (
 		Tab:         "Electrum-LTC (external)",
 		Description: "Use an external Electrum-LTC Wallet",
 		// json: DefaultConfigPath: filepath.Join(btcutil.AppDataDir("electrum-ltc", false), "config"), // e.g. ~/.electrum-ltc/config		ConfigOpts:        append(rpcOpts, commonOpts...),
-		ConfigOpts: append(btc.ElectrumConfigOpts, btc.CommonConfigOpts("LTC", false)...),
+		ConfigOpts: append(btc.ElectrumConfigOpts(), btc.CommonConfigOpts("LTC", false)...),
 	}
 	spvWalletDefinition = &asset.WalletDefinition{
 		Type:        walletTypeSPV,

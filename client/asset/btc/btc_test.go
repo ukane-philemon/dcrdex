@@ -639,7 +639,7 @@ func tNewWallet(segwit bool, walletType string) (*ExchangeWalletFullNode, *testD
 		Symbol:              "btc",
 		Logger:              tLogger,
 		ChainParams:         &chaincfg.MainNetParams,
-		WalletInfo:          WalletInfo,
+		WalletInfo:          WalletInfo(),
 		DefaultFallbackFee:  defaultFee,
 		DefaultFeeRateLimit: defaultFeeRateLimit,
 		Segwit:              segwit,
