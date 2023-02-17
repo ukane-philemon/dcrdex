@@ -774,6 +774,7 @@ func (c *Core) PostBond(form *PostBondForm) (*PostBondResult, error) {
 	}
 	_, err = wallet.refreshUnlock()
 	if err != nil {
+		// TODO: Unlock with form.AppPass?
 		return nil, fmt.Errorf("bond asset wallet %v is locked", unbip(bondAssetID))
 	}
 	if !wallet.synchronized() { // otherwise we might double spend if the wallet keys were used elsewhere
@@ -796,7 +797,8 @@ func (c *Core) PostBond(form *PostBondForm) (*PostBondResult, error) {
 
 	var success, acctExists bool
 
-	// When creating an account, the default is to maintain tier.
+	// When creating an account or registering a view-only account, the default
+	// is to maintain tier.
 	maintain := true
 	if form.MaintainTier != nil {
 		maintain = *form.MaintainTier
@@ -807,12 +809,14 @@ func (c *Core) PostBond(form *PostBondForm) (*PostBondResult, error) {
 	c.connMtx.RUnlock()
 	if found {
 		acctExists = !dc.acct.isViewOnly()
-		if acctExists && dc.acct.locked() { // require authDEX first to reconcile any existing bond statuses
-			return nil, newError(acctKeyErr, "acct locked %s (login first)", form.Addr)
-		}
-		if form.MaintainTier != nil || form.MaxBondedAmt != nil {
-			return nil, fmt.Errorf("maintain tier and max bonded amount may only be set when registering " +
-				"(use UpdateBondOptions to change bond maintenance settings)")
+		if acctExists {
+			if dc.acct.locked() { // require authDEX first to reconcile any existing bond statuses
+				return nil, newError(acctKeyErr, "acct locked %s (login first)", form.Addr)
+			}
+			if form.MaintainTier != nil || form.MaxBondedAmt != nil {
+				return nil, fmt.Errorf("maintain tier and max bonded amount may only be set when registering " +
+					"(use UpdateBondOptions to change bond maintenance settings)")
+			}
 		}
 	} else {
 		// Before connecting to the DEX host, do a quick balance check to ensure
@@ -823,21 +827,15 @@ func (c *Core) PostBond(form *PostBondForm) (*PostBondResult, error) {
 			return nil, newError(bondAssetErr, "insufficient available balance")
 		}
 
-		maxBondedAmt := 4 * form.Bond // default
-		if form.MaxBondedAmt != nil {
-			maxBondedAmt = *form.MaxBondedAmt
-		}
 		// New DEX connection.
 		cert, err := parseCert(host, form.Cert, c.net)
 		if err != nil {
 			return nil, newError(fileReadErr, "failed to read certificate file from %s: %v", cert, err)
 		}
 		dc, err = c.connectDEX(&db.AccountInfo{
-			Host:         host,
-			Cert:         cert,
-			BondAsset:    bondAssetID,
-			MaxBondedAmt: maxBondedAmt,
-			// TargetTier set after determining this bond's strength.
+			Host: host,
+			Cert: cert,
+			// bond maintenance options set below.
 		})
 		if err != nil {
 			if dc != nil {
@@ -908,9 +906,15 @@ func (c *Core) PostBond(form *PostBondForm) (*PostBondResult, error) {
 			"(target tier %d, bond asset %d, maxBonded %v). "+
 			"Consider using UpdateBondOptions instead.",
 			targetTier, autoBondAsset, wallet.amtString(maxBondedAmt))
-	} else if maintain { // new account with tier maintenance enabled
+	} else if maintain { // new account (or registering a view-only acct) with tier maintenance enabled
+		maxBondedAmt := 4 * form.Bond // default
+		if form.MaxBondedAmt != nil {
+			maxBondedAmt = *form.MaxBondedAmt
+		}
 		dc.acct.authMtx.Lock()
+		dc.acct.bondAsset = bondAssetID
 		dc.acct.targetTier = form.Bond / bondAsset.Amt
+		dc.acct.maxBondedAmt = maxBondedAmt
 		dc.acct.authMtx.Unlock()
 		// maxBondedAmt and bondAsset were set by connectDEX
 	}
@@ -1035,7 +1039,6 @@ func (c *Core) updatePendingBondConfs(dc *dexConnection, assetID uint32, coinID 
 	defer dc.acct.authMtx.Unlock()
 	bondIDStr := coinIDString(assetID, coinID)
 	dc.acct.pendingBondsConfs[bondIDStr] = confs
-	c.log.Errorf("attempted to update confs for bond %s not in pending bonds slice", bondIDStr)
 }
 
 func (c *Core) bondConfirmed(dc *dexConnection, assetID uint32, coinID []byte, newTier int64) error {
