@@ -690,7 +690,7 @@ func (c *Core) UpdateBondOptions(form *BondOptionsForm) error {
 	dc.acct.authMtx.Lock()
 	defer dc.acct.authMtx.Unlock()
 
-	// Revert to initial vals on any error.
+	// Revert to initial values if we encounter any error below.
 	bondAssetID0 := dc.acct.bondAsset
 	targetTier0, maxBondedAmt0 := dc.acct.targetTier, dc.acct.maxBondedAmt
 	var success bool
