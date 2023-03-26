@@ -1,3 +1,6 @@
+// This code is available on the terms of the project LICENSE.md file,
+// also available online at https://blueoakcouncil.org/license/1.0.0.
+
 package app
 
 import (
@@ -203,13 +206,6 @@ func ParseCLIConfig(cfg interface{}) error {
 // configuration file path from the CLI config, (presumably parsed with
 // ParseCLIConfig).
 func ResolveCLIConfigPaths(cfg *Config) (appData, configPath string) {
-	// Show the version and exit if the version flag was specified.
-	if cfg.ShowVer {
-		fmt.Printf("App version %s (Go version %s %s/%s)\n",
-			Version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
-		os.Exit(0)
-	}
-
 	// If the app directory has been changed, replace shortcut chars such
 	// as "~" with the full path.
 	if cfg.AppData != defaultApplicationDirectory {
@@ -269,7 +265,7 @@ func ResolveConfig(appData string, cfg *Config) error {
 		cfg.Net = dex.Mainnet
 		defaultDBPath, defaultLogPath = setNet(appData, "mainnet")
 	}
-	defaultHost := defaultHostByNetwork(cfg.Net)
+	defaultHost := DefaultHostByNetwork(cfg.Net)
 
 	// If web or RPC server addresses not set, use network specific
 	// defaults
@@ -325,9 +321,9 @@ func setNet(applicationDirectory, net string) (dbPath, logPath string) {
 	return filepath.Join(netDirectory, "dexc.db"), logFilename
 }
 
-// defaultHostByNetwork accepts configured network and returns the network
+// DefaultHostByNetwork accepts configured network and returns the network
 // specific default host
-func defaultHostByNetwork(network dex.Network) string {
+func DefaultHostByNetwork(network dex.Network) string {
 	switch network {
 	case dex.Testnet:
 		return defaultTestnetHost

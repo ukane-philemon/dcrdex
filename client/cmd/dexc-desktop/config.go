@@ -4,6 +4,10 @@
 package main
 
 import (
+	"fmt"
+	"os"
+	"runtime"
+
 	"decred.org/dcrdex/client/app"
 )
 
@@ -24,6 +28,14 @@ func configure() (*Config, error) {
 	if err := app.ParseCLIConfig(&cliCfg); err != nil {
 		return nil, err
 	}
+
+	// Show the version and exit if the version flag was specified.
+	if cliCfg.ShowVer {
+		fmt.Printf("Desktop app version %s (Go version %s %s/%s)\n",
+			app.Version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+		os.Exit(0)
+	}
+
 	appData, configPath := app.ResolveCLIConfigPaths(&cliCfg.Config)
 
 	// The full config.

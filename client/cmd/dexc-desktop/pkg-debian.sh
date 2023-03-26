@@ -69,7 +69,7 @@ mkdir -p "${ICON_BUILDDIR}"
 
 # Build dexc
 LDFLAGS="-s -w -X main.Version=${VER}${META:++${META}}"
-GOOS=linux GOARCH=${ARCH} go build -tags lgpl -o "${BIN_BUILDPATH}" -ldflags "$LDFLAGS"
+GOOS=linux GOARCH=${ARCH} go build -o "${BIN_BUILDPATH}" -ldflags "$LDFLAGS"
 chmod 755 "${BIN_BUILDPATH}"
 
 # Full control file specification -

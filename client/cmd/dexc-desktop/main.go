@@ -292,7 +292,7 @@ func mainCore() error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			runServer(appCtx, cfg.AppData, openC, killChan)
+			runServer(appCtx, cfg.AppData, openC, killChan, cfg.Net)
 		}()
 	}
 
@@ -396,6 +396,7 @@ func closeWindow(windowID uint32) {
 		default:
 		}
 	}
+	log.Infof("Closing window. %d windows remain open.", remain)
 	cmd.Process.Kill()
 }
 
@@ -426,9 +427,10 @@ func runWebviewSubprocess(ctx context.Context, url string) {
 	m.counter++
 	windowID := windowManager.counter
 	m.windows[windowID] = cmd
+	windowCount := len(m.windows)
 	m.Unlock()
 	defer closeWindow(windowID)
-
+	log.Info("Opening new window. %d windows open now", windowCount)
 	cmd.Run()
 }
 
@@ -484,7 +486,7 @@ func systrayOnReady(ctx context.Context, logDirectory string, openC chan<- struc
 		for range mOpen.ClickedCh {
 			select {
 			case openC <- struct{}{}:
-				log.Info("Window opened")
+				log.Debug("Received window reopen request from system tray")
 			default:
 				log.Infof("Ignored a window open request from the system tray")
 			}
@@ -493,7 +495,7 @@ func systrayOnReady(ctx context.Context, logDirectory string, openC chan<- struc
 
 	systray.AddSeparator()
 
-	if logDirURL, err := filePathToURL(logDirectory); err != nil {
+	if logDirURL, err := app.FilePathToURL(logDirectory); err != nil {
 		log.Errorf("error constructing log directory URL: %v", err)
 	} else {
 		mLogs := systray.AddMenuItem("Open logs folder", "Open the folder with your DEX logs.")
@@ -506,7 +508,7 @@ func systrayOnReady(ctx context.Context, logDirectory string, openC chan<- struc
 
 	// TODO: Allow editing of configuration? What happens when they screw it up
 	// and make startup impossible?
-	// if cfgPathURL, err := filePathToURL(cfgPath); err != nil {
+	// if cfgPathURL, err := app.FilePathToURL(cfgPath); err != nil {
 	// 	fmt.Fprintln(os.Stderr, err)
 	// } else {
 	// 	mConfigFile := systray.AddMenuItem("Edit config file", "Open the config file in a text editor.")

@@ -1,6 +1,12 @@
 package main
 
-import "decred.org/dcrdex/client/app"
+import (
+	"fmt"
+	"os"
+	"runtime"
+
+	"decred.org/dcrdex/client/app"
+)
 
 func configure() (*app.Config, error) {
 	// Pre-parse the command line options to see if an alternative config file
@@ -11,6 +17,14 @@ func configure() (*app.Config, error) {
 	if err := app.ParseCLIConfig(&preCfg); err != nil {
 		return nil, err
 	}
+
+	// Show the version and exit if the version flag was specified.
+	if preCfg.ShowVer {
+		fmt.Printf("App version %s (Go version %s %s/%s)\n",
+			app.Version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+		os.Exit(0)
+	}
+
 	appData, configPath := app.ResolveCLIConfigPaths(&preCfg)
 
 	// Load additional config from file.

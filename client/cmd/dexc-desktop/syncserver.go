@@ -25,6 +25,9 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"decred.org/dcrdex/client/app"
+	"decred.org/dcrdex/dex"
 )
 
 const (
@@ -65,7 +68,7 @@ func sendKillSignal(syncDir string) {
 		log.Errorf("nil kill response")
 		return
 	}
-	if resp.StatusCode == http.StatusOK {
+	if resp.StatusCode != http.StatusOK {
 		log.Errorf("Unexpected response code from kill signal send: %d (%s)", resp.StatusCode, http.StatusText(resp.StatusCode))
 	}
 }
@@ -93,30 +96,18 @@ func synchronize(syncDir string) (startServer, close bool, err error) {
 
 // runServer runs an instance of the sync server. Received commands are
 // communicated via unbuffered channels. Blocking channels are ignored.
-func runServer(ctx context.Context, syncDir string, openC chan<- struct{}, killC chan<- os.Signal) {
-	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
-	if err != nil {
-		log.Errorf("ResolveTCPAddr error: %v", err)
-		return
-	}
-
-	l, err := net.ListenTCP("tcp", addr)
+func runServer(ctx context.Context, syncDir string, openC chan<- struct{}, killC chan<- os.Signal, netw dex.Network) {
+	host := app.DefaultHostByNetwork(netw)
+	l, err := net.Listen("tcp", host+":0")
 	if err != nil {
 		log.Errorf("ListenTCP error: %v", err)
 		return
 	}
 
-	f, err := os.Create(filepath.Join(syncDir, syncFilename))
+	err = os.WriteFile(filepath.Join(syncDir, syncFilename), []byte(l.Addr().String()), 0644)
 	if err != nil {
 		log.Errorf("Failed to start the sync server: %v", err)
 		return
-	}
-	// Write the address to the syncfile.
-	if _, err := f.Write([]byte(l.Addr().String())); err != nil {
-		log.Errorf("Error writing syncfile: %v", err)
-	}
-	if err := f.Close(); err != nil {
-		log.Errorf("Error closing syncfile: %v", err)
 	}
 
 	srv := &http.Server{
@@ -154,16 +145,16 @@ func (s *syncServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/":
 		select {
 		case s.openC <- struct{}{}:
-			log.Info("Window reopened")
+			log.Debug("Received window reopen request")
 		default:
-			log.Infof("Ignored a window reopen request from another instance")
+			log.Info("Ignored a window reopen request from another instance")
 		}
 	case "/kill":
 		select {
 		case s.killC <- os.Interrupt:
 			log.Info("Kill signal received")
 		default:
-			log.Infof("Ignored a window reopen request from another instance")
+			log.Warnf("Kill request ignored (blocking channel)")
 		}
 	default:
 		log.Errorf("syncServer received a request with an unknown path %q", r.URL.Path)

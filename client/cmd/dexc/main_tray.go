@@ -63,7 +63,7 @@ func onReady() {
 
 	systray.AddSeparator()
 
-	if logDirURL, err := filePathToURL(logDirectory); err != nil {
+	if logDirURL, err := app.FilePathToURL(logDirectory); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	} else {
 		mLogs := systray.AddMenuItem("Open logs folder", "Open the folder with your DEX logs.")
@@ -77,7 +77,7 @@ func onReady() {
 		}()
 	}
 
-	if cfgPathURL, err := filePathToURL(cfgPath); err != nil {
+	if cfgPathURL, err := app.FilePathToURL(cfgPath); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	} else {
 		mConfigFile := systray.AddMenuItem("Edit config file", "Open the config file in a text editor.")
