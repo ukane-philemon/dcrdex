@@ -12,7 +12,12 @@ import (
 
 func main() {
 	// Wrap the actual main so defers run in it.
-	err := runCore()
+	// Parse configuration.
+	cfg, err := configure()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "configuration error: %v", err)
+	}
+	err = runCore(cfg)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

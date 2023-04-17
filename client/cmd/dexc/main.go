@@ -42,14 +42,8 @@ var (
 	log            dex.Logger
 )
 
-func runCore() error {
+func runCore(cfg *app.Config) error {
 	defer cancel() // for the earliest returns
-
-	// Parse configuration.
-	cfg, err := configure()
-	if err != nil {
-		return fmt.Errorf("configuration error: %w", err)
-	}
 
 	asset.SetNetwork(cfg.Net)
 
@@ -61,7 +55,7 @@ func runCore() error {
 
 	if cfg.CPUProfile != "" {
 		var f *os.File
-		f, err = os.Create(cfg.CPUProfile)
+		f, err := os.Create(cfg.CPUProfile)
 		if err != nil {
 			return fmt.Errorf("error starting CPU profiler: %w", err)
 		}
