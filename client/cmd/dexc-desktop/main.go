@@ -432,7 +432,9 @@ func runWebviewSubprocess(ctx context.Context, url string) {
 	m.Unlock()
 	defer closeWindow(windowID)
 	log.Infof("Opening new window. %d windows open now", windowCount)
-	cmd.Run()
+	if err := cmd.Run(); err != nil {
+		log.Errorf("webview run error: %v", err)
+	}
 }
 
 func findExePath() string {
@@ -506,10 +508,6 @@ func systrayOnReady(ctx context.Context, logDirectory string, openC chan<- struc
 			}
 		}()
 	}
-
-	// TODO: Enable toggling automatic startup on boot. This would be part of a
-	// larger effort aimed at securing refunds through system restarts.
-	// https://github.com/decred/dcrdex/pull/1957#discussion_r1020780014
 
 	systray.AddSeparator()
 
