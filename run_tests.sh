@@ -3,7 +3,7 @@ set -ex
 
 dir=$(pwd)
 # list of all modules to test
-modules=". ./dex/testing/loadbot"
+modules=". /dex/testing/loadbot"
 
 GV=$(go version | sed "s/^.*go\([0-9.]*\).*/\1/")
 echo "Go version: $GV"

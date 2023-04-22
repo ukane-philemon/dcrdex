@@ -134,7 +134,7 @@ func main() {
 	cfg, err = configure()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "configuration error: %v", err)
-		return
+		os.Exit(1)
 	}
 	systray.Run(onReady, onExit)
 }

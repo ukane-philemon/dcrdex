@@ -68,9 +68,6 @@ func runCore(cfg *app.Config) error {
 
 	// Initialize logging.
 	utc := !cfg.LocalLogs
-	if cfg.Net == dex.Simnet {
-		utc = false
-	}
 	logMaker, closeLogger := app.InitLogging(cfg.LogPath, cfg.DebugLevel, true, utc)
 	defer closeLogger()
 	log = logMaker.Logger("DEXC")

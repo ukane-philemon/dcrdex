@@ -31,8 +31,8 @@ func configure() (*Config, error) {
 
 	// Show the version and exit if the version flag was specified.
 	if cliCfg.ShowVer {
-		fmt.Printf("Desktop app version %s (Go version %s %s/%s)\n",
-			app.Version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+		fmt.Printf("%s version %s (Go version %s %s/%s)\n",
+			appName, app.Version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 		os.Exit(0)
 	}
 

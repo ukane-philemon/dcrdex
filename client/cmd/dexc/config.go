@@ -20,8 +20,8 @@ func configure() (*app.Config, error) {
 
 	// Show the version and exit if the version flag was specified.
 	if preCfg.ShowVer {
-		fmt.Printf("App version %s (Go version %s %s/%s)\n",
-			app.Version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+		fmt.Printf("%s version %s (Go version %s %s/%s)\n",
+			appName, app.Version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 		os.Exit(0)
 	}
 
@@ -32,7 +32,6 @@ func configure() (*app.Config, error) {
 		return nil, err
 	}
 
-	// Set the global *Config.
 	cfg := &iniCfg
 	return cfg, app.ResolveConfig(appData, cfg)
 }

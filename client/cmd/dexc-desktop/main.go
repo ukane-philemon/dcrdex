@@ -108,10 +108,13 @@ import (
 	"time"
 
 	"decred.org/dcrdex/client/app"
-	_ "decred.org/dcrdex/client/asset/bch" // register bch asset
-	_ "decred.org/dcrdex/client/asset/btc" // register btc asset
-	_ "decred.org/dcrdex/client/asset/dcr" // register dcr asset
-	_ "decred.org/dcrdex/client/asset/ltc" // register ltc asset
+	_ "decred.org/dcrdex/client/asset/bch"  // register bch asset
+	_ "decred.org/dcrdex/client/asset/btc"  // register btc asset
+	_ "decred.org/dcrdex/client/asset/dcr"  // register dcr asset
+	_ "decred.org/dcrdex/client/asset/dgb"  // register dgb asset
+	_ "decred.org/dcrdex/client/asset/doge" // register doge asset
+	_ "decred.org/dcrdex/client/asset/ltc"  // register ltc asset
+	_ "decred.org/dcrdex/client/asset/zec"  // register zec asset
 
 	// Ethereum loaded in client/app/importlgpl.go
 
@@ -119,13 +122,12 @@ import (
 	"decred.org/dcrdex/client/rpcserver"
 	"decred.org/dcrdex/client/webserver"
 	"decred.org/dcrdex/dex"
-	"github.com/webview/webview"
-
 	"fyne.io/systray"
 	"github.com/gen2brain/beeep"
+	"github.com/webview/webview"
 )
 
-const appName = "dexc"
+const appName = "dexc-desktop"
 
 var (
 	log     dex.Logger
@@ -150,7 +152,7 @@ func mainCore() error {
 	// Parse configuration.
 	cfg, err := configure()
 	if err != nil {
-		return fmt.Errorf("configration error: %w", err)
+		return fmt.Errorf("configuration error: %w", err)
 	}
 
 	// A single process cannot run multiple webview windows, so we run webview
@@ -166,9 +168,6 @@ func mainCore() error {
 
 	// Initialize logging.
 	utc := !cfg.LocalLogs
-	if cfg.Net == dex.Simnet {
-		utc = false
-	}
 	logMaker, closeLogger := app.InitLogging(cfg.LogPath, cfg.DebugLevel, cfg.LogStdout, utc)
 	defer closeLogger()
 	log = logMaker.Logger("APP")
@@ -178,15 +177,17 @@ func mainCore() error {
 			time.Now().Local().Format("15:04:05 MST"))
 	}
 
+	syncDir := filepath.Join(cfg.AppData, cfg.Net.String())
+
 	// The --kill flag is a backup measure to end a background process (that
 	// presumably has active orders).
 	if cfg.Kill {
-		sendKillSignal(cfg.AppData)
+		sendKillSignal(syncDir)
 		return nil
 	}
 
-	startServer, quit, err := synchronize(cfg.AppData)
-	if err != nil || quit {
+	startServer, err := synchronize(syncDir)
+	if err != nil || !startServer {
 		return err
 	}
 
@@ -292,7 +293,7 @@ func mainCore() error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			runServer(appCtx, cfg.AppData, openC, killChan, cfg.Net)
+			runServer(appCtx, syncDir, openC, killChan, cfg.Net)
 		}()
 	}
 
@@ -430,7 +431,7 @@ func runWebviewSubprocess(ctx context.Context, url string) {
 	windowCount := len(m.windows)
 	m.Unlock()
 	defer closeWindow(windowID)
-	log.Info("Opening new window. %d windows open now", windowCount)
+	log.Infof("Opening new window. %d windows open now", windowCount)
 	cmd.Run()
 }
 
@@ -505,32 +506,6 @@ func systrayOnReady(ctx context.Context, logDirectory string, openC chan<- struc
 			}
 		}()
 	}
-
-	// TODO: Allow editing of configuration? What happens when they screw it up
-	// and make startup impossible?
-	// if cfgPathURL, err := app.FilePathToURL(cfgPath); err != nil {
-	// 	fmt.Fprintln(os.Stderr, err)
-	// } else {
-	// 	mConfigFile := systray.AddMenuItem("Edit config file", "Open the config file in a text editor.")
-	// 	go func() {
-	// 		for range mConfigFile.ClickedCh {
-	// 			if _, err := os.Stat(cfgPath); err != nil {
-	// 				if os.IsNotExist(err) {
-	// 					fid, err := os.Create(cfgPath)
-	// 					if err != nil {
-	// 						fmt.Fprintf(os.Stderr, "failed to create new config file: %v", err)
-	// 						continue
-	// 					}
-	// 					fid.Close()
-	// 				}
-	// 			}
-	// 			err := browser.OpenURL(cfgPathURL)
-	// 			if err != nil {
-	// 				fmt.Fprintln(os.Stderr, err)
-	// 			}
-	// 		}
-	// 	}()
-	// }
 
 	// TODO: Enable toggling automatic startup on boot. This would be part of a
 	// larger effort aimed at securing refunds through system restarts.
