@@ -297,16 +297,6 @@ func mainCore() error {
 		}()
 	}
 
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		systray.Run(func() {
-			systrayOnReady(appCtx, filepath.Dir(cfg.LogPath), openC, killChan)
-		}, func() {
-			wg.Done()
-		})
-	}()
-
 	openWindow := func() {
 		wg.Add(1)
 		go func() {
@@ -317,48 +307,57 @@ func mainCore() error {
 
 	openWindow()
 
-windowloop:
-	for {
-		var backgroundNoteSent bool
-		select {
-		case <-windowManager.zeroLeft:
-		logout:
-			for {
-				err := clientCore.Logout()
-				if err == nil {
-					// Okay to quit.
-					break windowloop
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer cancel()
+	windowloop:
+		for {
+			var backgroundNoteSent bool
+			select {
+			case <-windowManager.zeroLeft:
+			logout:
+				for {
+					err := clientCore.Logout()
+					if err == nil {
+						// Okay to quit.
+						break windowloop
+					}
+					if !errors.Is(err, core.ActiveOrdersLogoutErr) {
+						// Unknown error. Force shutdown.
+						log.Errorf("Core logout error: %v", err)
+						break windowloop
+					}
+					if !backgroundNoteSent {
+						sendDesktopNotification("DEX client still running", "DEX client is still resolving active DEX orders")
+						backgroundNoteSent = true
+					}
+					// Can't log out. Keep checking until either
+					//   1. We can log out. Exit the program.
+					//   2. The user reopens the window (via syncserver).
+					select {
+					case <-time.After(time.Minute):
+						// Try to log out again.
+						continue logout
+					case <-openC:
+						// re-open the window
+						openWindow()
+						continue windowloop
+					case <-appCtx.Done():
+						break windowloop
+					}
 				}
-				if !errors.Is(err, core.ActiveOrdersLogoutErr) {
-					// Unknown error. Force shutdown.
-					log.Errorf("Core logout error: %v", err)
-					break windowloop
-				}
-				if !backgroundNoteSent {
-					sendDesktopNotification("DEX client still running", "DEX client is still resolving active DEX orders")
-					backgroundNoteSent = true
-				}
-				// Can't log out. Keep checking until either
-				//   1. We can log out. Exit the program.
-				//   2. The user reopens the window (via syncserver).
-				select {
-				case <-time.After(time.Minute):
-					// Try to log out again.
-					continue logout
-				case <-openC:
-					// re-open the window
-					openWindow()
-					continue windowloop
-				case <-appCtx.Done():
-					break windowloop
-				}
+			case <-appCtx.Done():
+				break windowloop
+			case <-openC:
+				openWindow()
 			}
-		case <-appCtx.Done():
-			break windowloop
-		case <-openC:
-			openWindow()
 		}
-	}
+	}()
+
+	systray.Run(func() {
+		systrayOnReady(appCtx, filepath.Dir(cfg.LogPath), openC, killChan)
+	}, nil)
 
 	closeAllWindows()
 

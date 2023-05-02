@@ -1,4 +1,4 @@
-//go:build systray && windows
+//go:build windows
 
 package app
 

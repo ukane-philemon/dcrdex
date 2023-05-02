@@ -1,4 +1,4 @@
-//go:build systray && darwin
+//go:build darwin
 
 package app
 

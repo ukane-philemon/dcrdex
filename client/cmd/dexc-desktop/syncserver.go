@@ -45,10 +45,11 @@ const (
 func getSyncAddress(syncDir string) (addr, killKey string, err error) {
 	syncFile := filepath.Join(syncDir, syncFilename)
 	b, err := os.ReadFile(syncFile)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return "", "", err
-		}
+	if err != nil && !os.IsNotExist(err) {
+		return "", "", err
+	}
+	syncAddr := string(b)
+	if syncAddr == "" {
 		return "", "", nil
 	}
 	lines := strings.Split(string(b), "\n")
