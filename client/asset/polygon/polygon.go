@@ -57,19 +57,13 @@ var (
 			// the value cannot be known until we connect and get network info.
 		},
 	}
-
-	chainIDs = map[dex.Network]int64{
-		dex.Mainnet: 137,
-		dex.Testnet: 80001, // Mumbai
-		dex.Simnet:  90001, // See dex/testing/polygon/genesis.json
-	}
 )
 
 type Driver struct{}
 
 // Open opens the Polygon exchange wallet. Start the wallet with its Run method.
 func (d *Driver) Open(cfg *asset.WalletConfig, logger dex.Logger, net dex.Network) (asset.Wallet, error) {
-	return eth.NewEVMWallet(BipID, chainIDs[net], cfg, logger, net)
+	return eth.NewEVMWallet(BipID, dexpolygon.ChainIDs[net], cfg, logger, net)
 }
 
 func (d *Driver) DecodeCoinID(coinID []byte) (string, error) {
@@ -88,5 +82,5 @@ func (d *Driver) Exists(walletType, dataDir string, settings map[string]string, 
 }
 
 func (d *Driver) Create(cfg *asset.CreateWalletParams) error {
-	return eth.CreateEVMWallet(chainIDs[cfg.Net], cfg, false)
+	return eth.CreateEVMWallet(dexpolygon.ChainIDs[cfg.Net], cfg, false)
 }
