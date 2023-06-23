@@ -107,6 +107,7 @@ export default class Application {
     this.showPopups = State.fetchLocal(State.popupsLK) === '1'
 
     console.log('Decred DEX Client App, Build', this.commitHash.substring(0, 7))
+    console.log('Dexc-Desktop ** Bust Test **')
 
     // Loggers can be enabled by setting a truthy value to the loggerID using
     // enableLogger. Settings are stored across sessions. See docstring for the
