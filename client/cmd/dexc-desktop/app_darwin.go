@@ -51,6 +51,12 @@ const int NavigationActionPolicyCancel = 1;
 void* createCompletionHandlerDelegate() {
    return [[CompletionHandlerDelegate alloc] init];
 }
+
+void activateApplication() {
+	// NSApplicationActivateIgnoringOtherApps is deprecated but still valid for macOS version 10.6 – 14.0.
+	// See: https://developer.apple.com/documentation/appkit/nsapplicationactivationoptions/nsapplicationactivateignoringotherapps?language=objc
+	[[NSRunningApplication currentApplication] activateWithOptions:(NSApplicationActivateAllWindows | NSApplicationActivateIgnoringOtherApps)];
+}
 */
 import "C"
 import (
@@ -419,7 +425,10 @@ func initCocoaDefaultDelegateClassWrapper(logDir string) *cocoaDefaultDelegateCl
 	// "NSApplicationDidFinishLaunchingNotification" when an application has
 	// finished launching. See:
 	// https://developer.apple.com/documentation/appkit/nsapplicationdidfinishlaunchingnotification?language=objc
-	ad.AddMethod("applicationDidFinishLaunching:", ad.handleApplicationDidFinishLaunching)
+	ad.AddMethod("applicationDidFinishLaunching:", func(_, _ objc.Object) {
+		createNewWebView()
+		C.activateApplication()
+	})
 	// MacOS will always execute this method when dexc-desktop icon on the dock
 	// is clicked or a new process is about to start, so we hijack the action
 	// and create new windows if all windows have been closed. See:
@@ -495,23 +504,6 @@ func (ad *cocoaDefaultDelegateClassWrapper) handleApplicationWillFinishLaunching
 	obj.SetMenu(menu)
 
 	setAppMainMenuBar()
-
-	// Hide the application until it is ready to be shown when we receive
-	// the "NSApplicationDidFinishLaunchingNotification" below. This also
-	// allows us to ensure the menu bar is redrawn.
-	cocoa.NSApp().TryToPerform_with_(objc.Sel("hide:"), nil)
-}
-
-func (ad *cocoaDefaultDelegateClassWrapper) handleApplicationDidFinishLaunching(_, _ objc.Object) {
-	// Unhide the app on the main thread after it has finished launching we need
-	// to give this priority before creating the window to ensure the window is
-	// immediately visible when it's created. This also has the side effect of
-	// redrawing the menu bar which will be unresponsive until it is redrawn.
-	mdCore.Dispatch(func() {
-		cocoa.NSApp().TryToPerform_with_(objc.Sel("unhide:"), nil)
-	})
-
-	createNewWebView()
 }
 
 func (ad *cocoaDefaultDelegateClassWrapper) handleApplicationShouldHandleReopenHasVisibleWindows(_ objc.Object) bool {
