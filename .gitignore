@@ -19,7 +19,6 @@ server/cmd/genkey/genkey
 server/cmd/dcrdex/dcrdex
 server/cmd/usermatches/usermatches
 markets.json
-dist/
 node_modules/
 client/cmd/dexc/dexc
 client/cmd/dexc-desktop/dexc-desktop
