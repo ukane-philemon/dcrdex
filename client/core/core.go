@@ -9665,10 +9665,15 @@ func (c *Core) tipChange(assetID uint32) {
 	c.waiterMtx.RUnlock()
 
 	assets := make(assetMap)
-	for _, dc := range c.dexConnections() {
-		newUpdates := c.tickAsset(dc, assetID)
-		if len(newUpdates) > 0 {
-			assets.merge(newUpdates)
+	// Receiving a tipChange notification before login is complete but after
+	// pending trades have been loaded is possible. This means dex accounts are
+	// still locked so move on.
+	if c.loggedIn {
+		for _, dc := range c.dexConnections() {
+			newUpdates := c.tickAsset(dc, assetID)
+			if len(newUpdates) > 0 {
+				assets.merge(newUpdates)
+			}
 		}
 	}
 
