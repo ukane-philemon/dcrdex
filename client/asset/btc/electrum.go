@@ -289,7 +289,7 @@ func (btc *ExchangeWalletElectrum) watchBlocks(ctx context.Context) {
 	defer ticker.Stop()
 
 	bestBlock := func() (*BlockVector, error) {
-		hdr, err := btc.node.getBestBlockHeader()
+		hdr, err := btc.node.GetBestBlockHeader()
 		if err != nil {
 			return nil, fmt.Errorf("getBestBlockHeader: %v", err)
 		}
@@ -314,7 +314,7 @@ func (btc *ExchangeWalletElectrum) watchBlocks(ctx context.Context) {
 			// only comparing heights instead of hashes, which means we might
 			// not notice a reorg to a block at the same height, which is
 			// unimportant because of how electrum searches for transactions.
-			stat, err := btc.node.syncStatus()
+			stat, err := btc.node.SyncStatus()
 			if err != nil {
 				btc.log.Errorf("failed to get sync status: %w", err)
 				continue
