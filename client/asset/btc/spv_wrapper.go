@@ -494,12 +494,8 @@ func (w *spvWallet) GetBlockHash(blockHeight int64) (*chainhash.Hash, error) {
 	return w.cl.GetBlockHash(blockHeight)
 }
 
-// getBlockHeight gets the mainchain height for the specified block. Returns
+// GetBlockHeight gets the mainchain height for the specified block. Returns
 // error for orphaned blocks.
-func (w *spvWallet) getBlockHeight(h *chainhash.Hash) (int32, error) {
-	return w.cl.GetBlockHeight(h)
-}
-
 func (w *spvWallet) GetBlockHeight(h *chainhash.Hash) (int32, error) {
 	return w.cl.GetBlockHeight(h)
 }
