@@ -529,11 +529,11 @@ func TestSwapConfirmations(t *testing.T) {
 	// DB path.
 	node.dbBlockForTx[swapTxHash] = &hashEntry{hash: *swapBlockHash}
 	node.dbBlockForTx[spendTxHash] = &hashEntry{hash: *spendBlockHash}
-	node.checkpoints[swapOutPt] = &scanCheckpoint{res: &filterScanResult{
-		blockHash:   swapBlockHash,
-		blockHeight: swapHeight,
-		spend:       &spendingInput{},
-		checkpoint:  *spendBlockHash,
+	node.checkpoints[swapOutPt] = &scanCheckpoint{res: &FilterScanResult{
+		BlockHash:   swapBlockHash,
+		BlockHeight: swapHeight,
+		Spend:       &SpendingInput{},
+		Checkpoint:  *spendBlockHash,
 	}}
 	checkSuccess("GetSpend", swapConfs, true)
 	delete(node.checkpoints, swapOutPt)
@@ -577,7 +577,7 @@ func TestFindBlockForTime(t *testing.T) {
 	matchTime := generateTestBlockTime(searchBlock)
 	const offsetBlock = searchBlock - testBlocksPerBlockTimeOffset
 	const startBlock = offsetBlock - medianTimeBlocks
-	_, height, err := spv.findBlockForTime(matchTime)
+	height, err := spv.FindBlockForTime(matchTime)
 	if err != nil {
 		t.Fatalf("findBlockForTime error: %v", err)
 	}
@@ -589,7 +589,7 @@ func TestFindBlockForTime(t *testing.T) {
 	// will continue down 11 more.
 	_, blk := node.getBlockAtHeight(startBlock)
 	blk.msgBlock.Header.Timestamp = generateTestBlockTime(offsetBlock)
-	_, height, err = spv.findBlockForTime(matchTime)
+	height, err = spv.FindBlockForTime(matchTime)
 	if err != nil {
 		t.Fatalf("findBlockForTime error for shifted start block: %v", err)
 	}
@@ -598,16 +598,16 @@ func TestFindBlockForTime(t *testing.T) {
 	}
 
 	// And doing an early enough block just returns genesis
-	blockHash, height, err := spv.findBlockForTime(generateTestBlockTime(10))
+	height, err = spv.FindBlockForTime(generateTestBlockTime(10))
 	if err != nil {
 		t.Fatalf("findBlockForTime error for genesis test: %v", err)
 	}
-	if *blockHash != *chaincfg.MainNetParams.GenesisHash {
+	if height != 0 {
 		t.Fatalf("not genesis: height = %d", height)
 	}
 
 	// A time way in the future still returns at least the last 11 blocks.
-	_, height, err = spv.findBlockForTime(generateTestBlockTime(100))
+	height, err = spv.FindBlockForTime(generateTestBlockTime(100))
 	if err != nil {
 		t.Fatalf("findBlockForTime error for future test: %v", err)
 	}
@@ -667,10 +667,10 @@ func TestGetTxOut(t *testing.T) {
 	// No wallet transaction, but we have a spend recorded.
 	node.getTransactionErr = WalletTransactionNotFound
 	node.getTransactionMap = nil
-	node.checkpoints[outPt] = &scanCheckpoint{res: &filterScanResult{
-		blockHash:  blockHash,
-		spend:      &spendingInput{},
-		checkpoint: *spendBlockHash,
+	node.checkpoints[outPt] = &scanCheckpoint{res: &FilterScanResult{
+		BlockHash:  blockHash,
+		Spend:      &SpendingInput{},
+		Checkpoint: *spendBlockHash,
 	}}
 	op, confs, err := spv.GetTxOut(&txHash, vout, pkScript, generateTestBlockTime(blockHeight))
 	if op != nil || confs != 0 || err != nil {
@@ -711,7 +711,7 @@ func TestGetTxOut(t *testing.T) {
 	}
 
 	// Make sure we can find it with the checkpoint.
-	node.checkpoints[outPt].res.spend = nil
+	node.checkpoints[outPt].res.Spend = nil
 	node.getCFilterScripts[*spendBlockHash] = nil
 	// We won't actually scan for the output itself, so nil'ing these should
 	// have no effect.
